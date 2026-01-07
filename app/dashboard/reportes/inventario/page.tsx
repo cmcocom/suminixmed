@@ -2,11 +2,11 @@
 
 import { api } from '@/lib/fetcher';
 import {
-  ChartBarIcon,
-  DocumentArrowDownIcon,
-  FunnelIcon,
-  PrinterIcon,
-  XMarkIcon,
+    ChartBarIcon,
+    DocumentArrowDownIcon,
+    FunnelIcon,
+    PrinterIcon,
+    XMarkIcon,
 } from '@heroicons/react/24/outline';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
