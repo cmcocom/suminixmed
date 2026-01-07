@@ -63,7 +63,7 @@ export async function GET(request: NextRequest) {
 // Obtener productos para reportes (sin requerir INVENTARIO.LEER)
 async function obtenerProductos(request: NextRequest) {
   const { searchParams } = new URL(request.url);
-  const limit = Math.min(parseInt(searchParams.get('limit') || '1000'), 10000);
+  const limit = Math.min(Number.parseInt(searchParams.get('limit') || '1000'), 10000);
 
   const productos = await prisma.inventario.findMany({
     select: {

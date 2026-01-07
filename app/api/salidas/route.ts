@@ -13,6 +13,9 @@ interface PartidaSalidaData {
   inventarioId: string; // Cambiar de number a string para coincidir con IDs reales
   cantidad: number;
   precio: number;
+  lote_entrada_id?: string | null;
+  numero_lote?: string | null;
+  fecha_vencimiento_lote?: string | null;
 }
 
 // Nota: la función getLocalDateTime fue removida porque no se usa actualmente.
@@ -29,8 +32,8 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
 
     // Parámetros de paginación
-    const page = parseInt(searchParams.get('page') || '1');
-    const limit = parseInt(searchParams.get('limit') || '10');
+    const page = Number.parseInt(searchParams.get('page') || '1');
+    const limit = Number.parseInt(searchParams.get('limit') || '10');
     const skip = (page - 1) * limit;
 
     // Validar límite de 30 salidas máximas
@@ -398,7 +401,7 @@ export async function POST(request: NextRequest) {
 
       // ✅ CORRECCIÓN: Usar folio manual si se proporciona, sino usar el automático
       let folioActual: string;
-      let debeIncrementarFolio = false;
+      let debeIncrementarFolio: boolean;
 
       if (folioManual !== undefined && folioManual !== null) {
         // Usuario proporcionó un folio específico - usarlo tal cual
@@ -444,7 +447,7 @@ export async function POST(request: NextRequest) {
           // Crear fecha a las 00:00 de México (UTC-6)
           const [year, month, day] = fecha_captura.split('-');
           fechaCreacion = new Date(
-            Date.UTC(parseInt(year), parseInt(month) - 1, parseInt(day), 6, 0, 0)
+            Date.UTC(Number.parseInt(year), Number.parseInt(month) - 1, Number.parseInt(day), 6, 0, 0)
           );
         }
       } else {
@@ -455,7 +458,7 @@ export async function POST(request: NextRequest) {
       // Crear la salida con folio y serie
       const salida = await tx.salidas_inventario.create({
         data: {
-          id: `salida_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          id: `salida_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`,
           motivo: referencia_externa || `Salida ${new Date().toLocaleDateString()}`,
           observaciones: observaciones || '',
           total,
@@ -481,10 +484,10 @@ export async function POST(request: NextRequest) {
         });
       } else if (folioManual !== undefined && folioManual !== null) {
         // ✅ AJUSTE: Si el folio manual es >= proximo_folio, actualizar para evitar huecos
-        const folioNumerico = parseInt(String(folioManual), 10);
+        const folioNumerico = Number.parseInt(String(folioManual), 10);
         const proximoActual = configFolios.proximo_folio ?? 1;
 
-        if (!isNaN(folioNumerico) && folioNumerico >= proximoActual) {
+        if (!Number.isNaN(folioNumerico) && folioNumerico >= proximoActual) {
           const nuevoProximo = folioNumerico + 1;
 
           await tx.config_folios.update({
@@ -528,10 +531,12 @@ export async function POST(request: NextRequest) {
       }
 
       // PASO 2: Obtener TODOS los lotes de una sola vez (si aplica)
-      const loteIds = partidas.map((p: any) => p.lote_entrada_id).filter(Boolean);
+      const loteIds = partidas.map((p: PartidaSalidaData) => p.lote_entrada_id).filter(Boolean) as string[];
 
-      let lotesMap = new Map();
-      if (loteIds.length > 0) {
+      const lotesMap = await (async () => {
+        if (loteIds.length === 0) {
+          return new Map<string, { id: string; cantidad_disponible: number; numero_lote: string | null }>();
+        }
         const lotes = await tx.partidas_entrada_inventario.findMany({
           where: { id: { in: loteIds } },
           select: {
@@ -540,16 +545,17 @@ export async function POST(request: NextRequest) {
             numero_lote: true,
           },
         });
+        return new Map(lotes.map((l) => [l.id, l]));
+      })();
 
-        lotesMap = new Map(lotes.map((l) => [l.id, l]));
-
-        // Validar disponibilidad de lotes
+      // Validar disponibilidad de lotes (solo si hay lotes)
+      if (loteIds.length > 0) {
         for (const partida of partidas) {
-          const loteId = (partida as any).lote_entrada_id;
+          const loteId = partida.lote_entrada_id;
           if (loteId) {
             const lote = lotesMap.get(loteId);
             if (!lote) {
-              throw new Error(`Lote ${(partida as any).numero_lote} no encontrado`);
+              throw new Error(`Lote ${partida.numero_lote} no encontrado`);
             }
             if (lote.cantidad_disponible < partida.cantidad) {
               throw new Error(
@@ -580,17 +586,17 @@ export async function POST(request: NextRequest) {
 
         // Preparar data para partida
         partidasData.push({
-          id: `partida_${Date.now()}_${i}_${Math.random().toString(36).substr(2, 9)}`,
+          id: `partida_${Date.now()}_${i}_${Math.random().toString(36).substring(2, 11)}`,
           salida_id: salida.id,
           inventario_id: partida.inventarioId,
           cantidad: partida.cantidad,
           precio: partida.precio,
           orden: i,
-          lote_entrada_id: (partida as any).lote_entrada_id || null,
-          numero_lote: (partida as any).numero_lote || null,
-          fecha_vencimiento_lote: (partida as any).fecha_vencimiento_lote
+          lote_entrada_id: partida.lote_entrada_id || null,
+          numero_lote: partida.numero_lote || null,
+          fecha_vencimiento_lote: partida.fecha_vencimiento_lote
             ? ((): Date | null => {
-                const fv = (partida as any).fecha_vencimiento_lote;
+                const fv = partida.fecha_vencimiento_lote;
                 if (!fv) return null;
                 const parts = String(fv).split('-').map(Number);
                 if (parts.length === 3) {
@@ -615,7 +621,7 @@ export async function POST(request: NextRequest) {
         });
 
         // Acumular decrementos de lotes (si aplica)
-        const loteId = (partida as any).lote_entrada_id;
+        const loteId = partida.lote_entrada_id;
         if (loteId) {
           const decrementoActual = loteUpdates.get(loteId) || 0;
           loteUpdates.set(loteId, decrementoActual + partida.cantidad);

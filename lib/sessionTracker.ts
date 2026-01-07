@@ -1,5 +1,6 @@
 import { prisma } from './prisma';
-import { randomUUID } from 'crypto';
+import { randomUUID } from 'node:crypto';
+import { logger } from './logger';
 
 async function notifySessionChange(
   operation: 'INSERT' | 'UPDATE' | 'DELETE',
@@ -10,8 +11,8 @@ async function notifySessionChange(
     const payload = JSON.stringify({ operation, userId, tabId, timestamp: Date.now() });
     await prisma.$executeRaw`SELECT pg_notify('session_change', ${payload})`;
   } catch (error) {
-    void error;
     // Error no crítico, notificación SSE falló
+    logger.debug('[SESSION] Notificación SSE falló:', error instanceof Error ? error.message : 'Error desconocido');
   }
 }
 
@@ -79,9 +80,8 @@ export async function registerActiveSession(userId: string, tabId: string = 'def
         'Se alcanzó el límite de usuarios conectados simultáneamente. Intenta más tarde.';
 
       // Buscar mensaje específico del trigger en el error
-      const match = errStr.match(
-        /Límite máximo de usuarios concurrentes \((\d+)\), actuales: (\d+)/i
-      );
+      const regex = /Límite máximo de usuarios concurrentes \((\d+)\), actuales: (\d+)/i;
+      const match = regex.exec(errStr);
       if (match) {
         const [, max, current] = match;
         cleanMessage = `Límite máximo de usuarios concurrentes (${max}), actuales: ${current}`;
@@ -121,7 +121,7 @@ export async function updateSessionActivity(userId: string, tabId: string = 'def
     await notifySessionChange('UPDATE', userId, tabId);
     return true;
   } catch (error) {
-    void error;
+    logger.debug('[SESSION] Error actualizando actividad:', error instanceof Error ? error.message : 'Error desconocido');
     return false;
   }
 }
@@ -144,7 +144,7 @@ export async function removeActiveSession(userId: string, tabId: string = 'defau
     }
     return true;
   } catch (error) {
-    void error;
+    logger.debug('[SESSION] Error eliminando sesión:', error instanceof Error ? error.message : 'Error desconocido');
     return false;
   }
 }
@@ -153,30 +153,25 @@ export async function removeActiveSession(userId: string, tabId: string = 'defau
  * Limpia sesiones expiradas (5 minutos o más de inactividad)
  * OPTIMIZADO: Async para no bloquear
  */
-export async function cleanExpiredSessions() {
+export async function cleanExpiredSessions(): Promise<number> {
   try {
     const minutes = await getSessionTimeoutMinutesDefault();
     const cutoff = new Date(Date.now() - minutes * 60 * 1000);
 
-    // OPTIMIZACIÓN: Ejecutar en background sin await
-    prisma.active_sessions
-      .deleteMany({
-        where: {
-          lastActivity: { lte: cutoff },
-        },
-      })
-      .then((deleted) => {
-        if (deleted.count > 0) {
-          notifySessionChange('DELETE', '*', null);
-        }
-      })
-      .catch(() => {
-        // Error no crítico en producción
-      });
+    // Ejecutar eliminación y retornar el conteo
+    const deleted = await prisma.active_sessions.deleteMany({
+      where: {
+        lastActivity: { lte: cutoff },
+      },
+    });
+    
+    if (deleted.count > 0) {
+      await notifySessionChange('DELETE', '*', null);
+    }
 
-    return 0; // Retornar inmediatamente
+    return deleted.count;
   } catch (error) {
-    void error;
+    logger.debug('[SESSION] Error limpiando sesiones expiradas:', error instanceof Error ? error.message : 'Error desconocido');
     return 0;
   }
 }
@@ -196,7 +191,7 @@ export async function removeAllUserSessions(userId: string) {
     }
     return deleted.count;
   } catch (error) {
-    void error;
+    logger.debug('[SESSION] Error eliminando sesiones de usuario:', error instanceof Error ? error.message : 'Error desconocido');
     return 0;
   }
 }
@@ -228,7 +223,7 @@ export async function getActiveSessions() {
 
     return sessions;
   } catch (error) {
-    void error;
+    logger.debug('[SESSION] Error obteniendo sesiones activas:', error instanceof Error ? error.message : 'Error desconocido');
     return [];
   }
 }

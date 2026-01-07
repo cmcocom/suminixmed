@@ -1,5 +1,6 @@
 import { ALL_MODULES } from './rbac-modules';
 import { prisma } from './prisma';
+import { logger } from './logger';
 
 const ROUTE_MODULE_MAP: Record<string, string> = {
   '/dashboard': 'DASHBOARD',
@@ -34,8 +35,20 @@ function normalizeRoute(routePath: string): string {
   if (!path) return '/dashboard';
   if (path === '/') return '/dashboard';
   return path.endsWith('/') && path !== '/dashboard'
-    ? path.replace(/\/+/g, '/').replace(/\/$/, '')
-    : path.replace(/\/+/g, '/');
+    ? path.replaceAll(/\/+/g, '/').replace(/\/$/, '')
+    : path.replaceAll(/\/+/g, '/');
+}
+
+/**
+ * Resuelve el módulo de ajustes basado en el segmento de ruta
+ */
+function resolveAjustesModule(segment: string): string {
+  const ajustesMap: Record<string, string> = {
+    'respaldos': 'GESTION_RESPALDOS',
+    'generador-reportes': 'GESTION_REPORTES',
+    'catalogos': 'GESTION_CATALOGOS',
+  };
+  return ajustesMap[segment] ?? `AJUSTES_${segment.replaceAll('-', '_').toUpperCase()}`;
 }
 
 function resolveModuleFromRoute(routePath: string): string | null {
@@ -60,36 +73,28 @@ function resolveModuleFromRoute(routePath: string): string | null {
   }
 
   // Heurística: tomar segundo segmento como módulo base
-  const base = segments[1]?.replace(/-/g, '_').toUpperCase();
+  const base = segments[1]?.replaceAll('-', '_').toUpperCase();
   if (base && ALL_MODULES.includes(base)) {
     return base;
   }
 
   // Heurística especial para secciones agrupadas
   if (segments[1] === 'reportes' && segments[2]) {
-    const reportModule = `REPORTES_${segments[2].replace(/-/g, '_').toUpperCase()}`;
+    const reportModule = `REPORTES_${segments[2].replaceAll('-', '_').toUpperCase()}`;
     if (ALL_MODULES.includes(reportModule)) {
       return reportModule;
     }
   }
 
   if (segments[1] === 'catalogos' && segments[2]) {
-    const catalogModule = `CATALOGOS_${segments[2].replace(/-/g, '_').toUpperCase()}`;
+    const catalogModule = `CATALOGOS_${segments[2].replaceAll('-', '_').toUpperCase()}`;
     if (ALL_MODULES.includes(catalogModule)) {
       return catalogModule;
     }
   }
 
   if (segments[1] === 'ajustes' && segments[2]) {
-    const ajustesModule =
-      segments[2] === 'respaldos'
-        ? 'GESTION_RESPALDOS'
-        : segments[2] === 'generador-reportes'
-          ? 'GESTION_REPORTES'
-          : segments[2] === 'catalogos'
-            ? 'GESTION_CATALOGOS'
-            : `AJUSTES_${segments[2].replace(/-/g, '_').toUpperCase()}`;
-
+    const ajustesModule = resolveAjustesModule(segments[2]);
     if (ALL_MODULES.includes(ajustesModule)) {
       return ajustesModule;
     }
@@ -131,7 +136,7 @@ export async function isSystemUser(userId: string): Promise<boolean> {
     });
     return user?.is_system_user ?? false;
   } catch (error) {
-    void error;
+    logger.debug('[RBAC] Error verificando usuario sistema:', error instanceof Error ? error.message : 'Error desconocido');
     return false;
   }
 }
@@ -151,7 +156,7 @@ export async function hasSystemRole(userId: string): Promise<boolean> {
     `;
     return Number(result[0].count) > 0;
   } catch (error) {
-    void error;
+    logger.debug('[RBAC] Error verificando rol sistema:', error instanceof Error ? error.message : 'Error desconocido');
     return false;
   }
 }
@@ -198,7 +203,7 @@ export async function checkUserPermissionNoCache(
 
     return Number(result[0].count) > 0;
   } catch (error) {
-    void error;
+    logger.debug('[RBAC] Error verificando permiso (no cache):', error instanceof Error ? error.message : 'Error desconocido');
     return false;
   }
 }
@@ -246,7 +251,7 @@ export async function getUserPermissions(userId: string): Promise<UserPermission
 
     return permissions;
   } catch (error) {
-    void error;
+    logger.debug('[RBAC] Error obteniendo permisos:', error instanceof Error ? error.message : 'Error desconocido');
     return [];
   }
 }
@@ -272,7 +277,7 @@ export async function getUserRoles(userId: string): Promise<UserRole[]> {
 
     return roles.map((ur) => ur.rbac_roles);
   } catch (error) {
-    void error;
+    logger.debug('[RBAC] Error obteniendo roles:', error instanceof Error ? error.message : 'Error desconocido');
     return [];
   }
 }
@@ -285,7 +290,7 @@ export async function getUserRolesFiltered(userId: string): Promise<UserRole[]> 
     const roles = await getUserRoles(userId);
     return roles.filter((r) => !r.is_system_role);
   } catch (error) {
-    void error;
+    logger.debug('[RBAC] Error obteniendo roles filtrados:', error instanceof Error ? error.message : 'Error desconocido');
     return [];
   }
 }
@@ -311,7 +316,7 @@ export async function checkModuleAccess(userId: string, module: string): Promise
 
     return Number(result[0].count) > 0;
   } catch (error) {
-    void error;
+    logger.debug('[RBAC] Error verificando acceso módulo:', error instanceof Error ? error.message : 'Error desconocido');
     return false;
   }
 }
@@ -358,7 +363,7 @@ export async function getUserVisibleModules(userId: string): Promise<string[]> {
 
     return Array.from(modules);
   } catch (error) {
-    void error;
+    logger.debug('[RBAC] Error obteniendo módulos visibles:', error instanceof Error ? error.message : 'Error desconocido');
     return [];
   }
 }
@@ -399,7 +404,7 @@ export async function canAccessRoute(userId: string, routePath: string): Promise
 
     return checkModuleAccess(userId, moduleKey);
   } catch (error) {
-    void error;
+    logger.debug('[RBAC] Error verificando acceso a ruta:', error instanceof Error ? error.message : 'Error desconocido');
     return true;
   }
 }
@@ -455,7 +460,7 @@ export async function checkMultiplePermissions(
 
     return results;
   } catch (error) {
-    void error;
+    logger.debug('[RBAC] Error verificando múltiples permisos, usando fallback:', error instanceof Error ? error.message : 'Error desconocido');
     // Fallback: Check one by one
     const results: Record<string, boolean> = {};
     for (const p of permissions) {
@@ -535,7 +540,7 @@ export function clearPermissionCache(userId?: string): void {
       }
     }
   } else {
-    // Limpiar todo el caché
+    // Vaciar completamente el caché de permisos
     permissionCache.clear();
   }
 }

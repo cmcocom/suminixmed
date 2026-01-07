@@ -9,6 +9,8 @@ interface PartidaEntradaData {
   inventario_id: string;
   cantidad: number;
   precio: number;
+  numero_lote?: string | null;
+  fecha_vencimiento?: string | null;
 }
 
 // GET - Obtener entradas de inventario con paginación server-side
@@ -23,8 +25,8 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
 
     // Parámetros de paginación
-    const page = Math.max(1, parseInt(searchParams.get('page') || '1'));
-    const requestedLimit = parseInt(searchParams.get('limit') || '10');
+    const page = Math.max(1, Number.parseInt(searchParams.get('page') || '1'));
+    const requestedLimit = Number.parseInt(searchParams.get('limit') || '10');
     const limit = Math.min(Math.max(1, requestedLimit), 100); // Máximo 100 por seguridad
     const search = searchParams.get('search') || '';
     const sortBy = searchParams.get('sortBy') || 'fecha_creacion';
@@ -298,7 +300,7 @@ export async function POST(request: NextRequest) {
       // Crear la entrada con folio y serie
       const entrada = await tx.entradas_inventario.create({
         data: {
-          id: `entrada_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          id: `entrada_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`,
           motivo,
           observaciones,
           total,
@@ -367,15 +369,15 @@ export async function POST(request: NextRequest) {
 
         // Preparar data para partida
         partidasData.push({
-          id: `partida_entrada_${Date.now()}_${i}_${Math.random().toString(36).substr(2, 9)}`,
+          id: `partida_entrada_${Date.now()}_${i}_${Math.random().toString(36).substring(2, 11)}`,
           entrada_id: entrada.id,
           inventario_id: partida.inventario_id,
           cantidad: partida.cantidad,
           precio: partida.precio,
           orden: i,
-          numero_lote: (partida as any).numero_lote || null,
-          fecha_vencimiento: (partida as any).fecha_vencimiento
-            ? new Date((partida as any).fecha_vencimiento)
+          numero_lote: partida.numero_lote || null,
+          fecha_vencimiento: partida.fecha_vencimiento
+            ? new Date(partida.fecha_vencimiento)
             : null,
           cantidad_disponible: partida.cantidad,
           createdAt: new Date(),
@@ -442,11 +444,11 @@ export async function POST(request: NextRequest) {
       errorMessage.includes('Configuración');
 
     // Log completo para errores técnicos (500), no para validaciones esperadas
-    if (!isValidationError) {
+    if (isValidationError) {
+      console.log('⚠️ Error de validación en POST /api/entradas:', errorMessage);
+    } else {
       console.error('❌ Error técnico en POST /api/entradas:', error);
       console.error('💥 Stack trace:', error instanceof Error ? error.stack : 'No stack trace');
-    } else {
-      console.log('⚠️ Error de validación en POST /api/entradas:', errorMessage);
     }
 
     return NextResponse.json(

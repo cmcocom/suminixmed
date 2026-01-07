@@ -16,9 +16,9 @@ export const GET = createProtectedAPI('INVENTARIO', 'LEER', async ({ user, req }
     const inStock = searchParams.get('inStock') === 'true';
     // ✅ OPTIMIZACIÓN: Ajustado para mostrar más productos por defecto
     // 500 productos × 2KB = 1MB JSON → buen balance rendimiento/usabilidad
-    const requestedLimit = parseInt(searchParams.get('limit') || '500');
+    const requestedLimit = Number.parseInt(searchParams.get('limit') || '500');
     const limit = Math.min(requestedLimit, 1000); // Máximo 1000 productos
-    const page = parseInt(searchParams.get('page') || '1');
+    const page = Number.parseInt(searchParams.get('page') || '1');
     const offset = (page - 1) * limit;
 
     // Aplicar filtro basado en rol (si aplica, `applyRoleBasedFilter` devuelve un marcador
@@ -42,7 +42,7 @@ export const GET = createProtectedAPI('INVENTARIO', 'LEER', async ({ user, req }
     const where: Record<string, any> = { ...cleanedBaseFilter };
 
     // Filtro de búsqueda
-    if (search && search.trim()) {
+    if (search?.trim()) {
       const searchTerm = search.trim();
       where.OR = [
         { nombre: { contains: searchTerm, mode: 'insensitive' } },
@@ -129,7 +129,7 @@ export const GET = createProtectedAPI('INVENTARIO', 'LEER', async ({ user, req }
         hasPrevPage,
       },
     });
-  } catch (error) {
+  } catch {
     return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 });
   }
 });
@@ -235,32 +235,32 @@ export const POST = createProtectedAPI('INVENTARIO', 'CREAR', async ({ req, user
     }
 
     // Calcular cantidad y estado automáticamente
-    const nuevaCantidad = parseInt(cantidad) || 0;
+    const nuevaCantidad = Number.parseInt(cantidad) || 0;
     const nuevaFechaVencimiento = fechaVencimiento ? new Date(fechaVencimiento) : null;
     const nuevoEstado = calcularEstadoInventario(nuevaCantidad, nuevaFechaVencimiento);
 
     // Crear producto
     const createData: any = {
-      id: `inv_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      id: `inv_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`,
       nombre: descripcion,
       clave: clave || null,
       clave2: clave2 || null,
       descripcion,
       categoria: categoriaNombre,
       cantidad: nuevaCantidad,
-      precio: parseFloat(precio) || 0,
+      precio: Number.parseFloat(precio) || 0,
       fechaVencimiento: nuevaFechaVencimiento,
       estado: nuevoEstado,
       imagen,
       numero_lote: numero_lote || null,
       cantidad_minima: 0, // Deprecated: usar punto_reorden
       cantidad_maxima:
-        cantidad_maxima !== undefined && cantidad_maxima !== null ? parseInt(cantidad_maxima) : 0,
+        cantidad_maxima !== undefined && cantidad_maxima !== null ? Number.parseInt(cantidad_maxima) : 0,
       punto_reorden:
-        punto_reorden !== undefined && punto_reorden !== null ? parseInt(punto_reorden) : 0,
+        punto_reorden !== undefined && punto_reorden !== null ? Number.parseInt(punto_reorden) : 0,
       dias_reabastecimiento:
         dias_reabastecimiento !== undefined && dias_reabastecimiento !== null
-          ? parseInt(dias_reabastecimiento)
+          ? Number.parseInt(dias_reabastecimiento)
           : 7,
       unidad_medida_id: unidad_medida_id || null,
       updatedAt: new Date(),

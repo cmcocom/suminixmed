@@ -603,8 +603,9 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
           const maxFolioReal = result[0]?.max_folio ?? 0;
           const nuevoProximo = maxFolioReal + 1;
 
-          // Solo actualizar si el nuevo es MAYOR (lógica GREATEST - no retroceder)
-          if (nuevoProximo > (configActual.proximo_folio ?? 0)) {
+          // Actualizar si el nuevo próximo folio es MENOR que el actual (reutilizar folios eliminados)
+          // O si el actual es null/0 (inicialización)
+          if (nuevoProximo < (configActual.proximo_folio ?? 0) || (configActual.proximo_folio ?? 0) === 0) {
             await tx.config_folios.update({
               where: { tipo: 'salida' },
               data: {
@@ -618,7 +619,7 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
             );
           } else {
             logger.debug(
-              `✅ [DELETE SALIDA] proximo_folio vigente: ${configActual.proximo_folio} (MAX real: ${maxFolioReal}, no retrocede)`
+              `✅ [DELETE SALIDA] proximo_folio vigente: ${configActual.proximo_folio} (MAX real: ${maxFolioReal}, no hay necesidad de ajuste)`
             );
           }
         }

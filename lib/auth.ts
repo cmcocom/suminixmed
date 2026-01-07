@@ -4,6 +4,78 @@ import { prisma } from './prisma';
 import { deriveUserRoles } from './rbac/derive-user-roles';
 import { registerActiveSession, removeAllUserSessions } from './sessionTracker';
 import { validateUserLogin } from './userLicense';
+import { logger } from './logger';
+
+/**
+ * Actualiza el token con datos de la BD
+ */
+async function updateTokenFromDB(token: any): Promise<any> {
+  if (!token.id) {
+    logger.error('[AUTH] Token sin ID en update trigger');
+    return token;
+  }
+
+  const updatedUser = await prisma.user.findUnique({
+    where: { id: token.id },
+    select: {
+      id: true,
+      email: true,
+      name: true,
+      image: true,
+      activo: true,
+    },
+  });
+
+  if (updatedUser) {
+    token.email = updatedUser.email;
+    token.name = updatedUser.name;
+    token.image = updatedUser.image;
+    token.activo = updatedUser.activo;
+  }
+  return token;
+}
+
+/**
+ * Actualiza el token con datos de la sesión proporcionada
+ */
+function updateTokenFromSession(token: any, session: any): any {
+  if (session?.user?.image !== undefined) token.image = session.user.image;
+  if (session?.user?.name !== undefined) token.name = session.user.name;
+  if (session?.user?.email !== undefined) token.email = session.user.email;
+  return token;
+}
+
+/**
+ * Inicializa el token con datos del usuario autenticado
+ */
+function initializeTokenFromUser(token: any, user: any): any {
+  const effectivePrimary = user.primaryRole || null;
+  token.id = user.id;
+  token.email = user.email || null;
+  token.name = user.name || null;
+  token.image = user.image || null;
+  token.primaryRole = effectivePrimary;
+  token.roles = user.roles || (effectivePrimary ? [effectivePrimary] : []);
+  token.rolesSource = user.rolesSource || 'unknown';
+  token.activo = user.activo ?? true;
+  return token;
+}
+
+/**
+ * Deriva roles del usuario si no existen en el token
+ */
+async function deriveRolesIfMissing(token: any): Promise<any> {
+  const hasRoles = token.roles && Array.isArray(token.roles) && token.roles.length > 0;
+  if (token?.id && !hasRoles) {
+    const derived = await deriveUserRoles(token.id);
+    if (derived.roles && derived.roles.length > 0) {
+      token.primaryRole = derived.primaryRole;
+      token.roles = derived.roles;
+      token.rolesSource = derived.source;
+    }
+  }
+  return token;
+}
 
 export const authOptions = {
   secret: process.env.NEXTAUTH_SECRET,
@@ -124,7 +196,8 @@ export const authOptions = {
         // Por defecto, usar baseUrl para seguridad
         return baseUrl;
       } catch (e) {
-        // Si no se puede parsear la URL, caer a la ruta segura por defecto
+        // Si no se puede parsear la URL, usar ruta segura por defecto
+        logger.debug('[AUTH] Error parseando URL de redirección:', e instanceof Error ? e.message : 'Error desconocido');
         return baseUrl;
       }
     },
@@ -140,101 +213,60 @@ export const authOptions = {
       trigger?: string;
       session?: any;
     }) {
-      // 🔒 CRÍTICO: Validar que el token existe y es un objeto válido
+      // Validar que el token existe y es un objeto válido
       if (!token || typeof token !== 'object') {
-        console.error('[AUTH] Token inválido o corrupto detectado');
-        return {}; // Retornar token vacío para forzar re-autenticación
+        logger.error('[AUTH] Token inválido o corrupto detectado');
+        return {};
       }
 
-      // IMPORTANTE: Incluir rol y estado activo en el token JWT
-
-      // Manejar actualizaciones manuales de sesión (ej: cambio de imagen)
+      // Manejar actualizaciones manuales de sesión
       if (trigger === 'update') {
-        // Cuando se llama updateSession() sin parámetros, recargar desde BD
-        if (!session || Object.keys(session).length === 0) {
+        const hasSessionData = session && Object.keys(session).length > 0;
+        if (!hasSessionData) {
           try {
-            // 🔒 Validar que token.id existe antes de consultar BD
-            if (!token.id) {
-              console.error('[AUTH] Token sin ID en update trigger');
-              return token;
-            }
-
-            const updatedUser = await prisma.user.findUnique({
-              where: { id: token.id },
-              select: {
-                id: true,
-                email: true,
-                name: true,
-                image: true,
-                activo: true,
-              },
-            });
-
-            if (updatedUser) {
-              token.email = updatedUser.email;
-              token.name = updatedUser.name;
-              token.image = updatedUser.image;
-              token.activo = updatedUser.activo;
-            }
+            return await updateTokenFromDB(token);
           } catch (error) {
-            console.error('[AUTH] Error actualizando usuario en JWT:', error);
-            // Error no crítico en producción
+            logger.error('[AUTH] Error actualizando usuario en JWT:', error);
+            return token;
           }
-        } else {
-          // Si viene session con datos, usar esos
-          if (session?.user?.image !== undefined) token.image = session.user.image;
-          if (session?.user?.name !== undefined) token.name = session.user.name;
-          if (session?.user?.email !== undefined) token.email = session.user.email;
         }
+        return updateTokenFromSession(token, session);
+      }
+
+      // Inicializar token con datos del usuario
+      if (user) {
+        return initializeTokenFromUser(token, user);
+      }
+
+      // Derivar roles si faltan
+      try {
+        return await deriveRolesIfMissing(token);
+      } catch (err) {
+        logger.error('[AUTH] Error derivando roles en JWT:', err);
         return token;
       }
-
-      if (user) {
-        const effectivePrimary = user.primaryRole || null;
-        token.id = user.id;
-        token.email = user.email || null;
-        token.name = user.name || null;
-        token.image = user.image || null;
-        token.primaryRole = effectivePrimary;
-        token.roles = user.roles || (effectivePrimary ? [effectivePrimary] : []);
-        token.rolesSource = user.rolesSource || 'unknown';
-        token.activo = user.activo !== undefined ? user.activo : true;
-      }
-      // Fallback: derivar roles si no existen
-      else if (
-        token &&
-        token.id &&
-        (!token.roles || (Array.isArray(token.roles) && token.roles.length === 0))
-      ) {
-        try {
-          const derived = await deriveUserRoles(token.id);
-          if (derived.roles && derived.roles.length > 0) {
-            token.primaryRole = derived.primaryRole;
-            token.roles = derived.roles;
-            token.rolesSource = derived.source;
-          }
-        } catch (err) {
-          console.error('[AUTH] Error derivando roles en JWT:', err);
-          // Error no crítico en producción
-        }
-      }
-      return token;
     },
 
     async session({ session, token }: { session: any; token: any }) {
-      // 🔒 CRÍTICO: Validar que session y token existen y son objetos válidos
+      // Validar que session y token existen y son objetos válidos
       if (!session || typeof session !== 'object') {
-        console.error('[AUTH] Session inválida detectada');
-        return { user: {} }; // Retornar sesión vacía
+        logger.error('[AUTH] Session inválida detectada');
+        return { user: {} };
       }
 
       if (!token || typeof token !== 'object') {
-        console.error('[AUTH] Token inválido en session callback');
+        logger.error('[AUTH] Token inválido en session callback');
         return session;
       }
 
-      // IMPORTANTE: Incluir rol y estado activo en la sesión
-      if (session.user && token && token.id) {
+      // Validar que el token tiene ID
+      if (!token.id) {
+        logger.error('[AUTH] Token sin ID válido en session callback');
+        return { user: {} };
+      }
+
+      // Incluir datos del usuario en la sesión
+      if (session.user) {
         session.user.id = token.id;
         session.user.email = token.email || null;
         session.user.name = token.name || null;
@@ -242,11 +274,7 @@ export const authOptions = {
         session.user.primaryRole = token.primaryRole || 'OPERADOR';
         session.user.roles = Array.isArray(token.roles) ? token.roles : [];
         session.user.rolesSource = token.rolesSource || 'unknown';
-        session.user.activo = token.activo !== undefined ? token.activo : true;
-      } else if (session.user && !token.id) {
-        // Token sin ID válido - marcar sesión como inválida
-        console.error('[AUTH] Token sin ID válido en session callback');
-        return { user: {} };
+        session.user.activo = token.activo ?? true;
       }
       return session;
     },
@@ -266,7 +294,7 @@ export const authOptions = {
           await removeAllUserSessions(token.id);
         }
       } catch (e) {
-        // Error no crítico en producción
+        logger.debug('[AUTH] Error en signOut:', e instanceof Error ? e.message : 'Error desconocido');
       }
     },
   },

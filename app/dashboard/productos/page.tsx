@@ -10,6 +10,33 @@ import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'react-hot-toast';
 
+// Funciones auxiliares para evitar ternarios anidados
+function getEmptyStateTitle(showAll: boolean, searchTerm: string): string {
+  if (!showAll && searchTerm.trim() === '') {
+    return 'Selecciona una opción para ver productos';
+  }
+  if (searchTerm.trim() !== '') {
+    return 'No se encontraron productos con esa búsqueda';
+  }
+  return 'No hay productos registrados';
+}
+
+function getEmptyStateDescription(showAll: boolean, searchTerm: string): string {
+  if (!showAll && searchTerm.trim() === '') {
+    return "Marca 'Mostrar todos los productos' o busca por nombre/descripción";
+  }
+  if (searchTerm.trim() !== '') {
+    return 'Intenta con otros términos de búsqueda';
+  }
+  return 'Comience creando un nuevo producto.';
+}
+
+function getEstadoClassName(estado?: string): string {
+  if (estado === 'DISPONIBLE') return 'bg-green-100 text-green-800';
+  if (estado === 'AGOTADO') return 'bg-yellow-100 text-yellow-800';
+  return 'bg-red-100 text-red-800';
+}
+
 interface Categoria {
   id: string;
   descripcion: string;
@@ -21,15 +48,6 @@ interface UnidadMedida {
   clave: string;
   nombre: string;
   descripcion?: string;
-}
-
-interface Proveedor {
-  id: string;
-  nombre: string;
-  razon_social?: string;
-  rfc?: string;
-  email?: string;
-  activo: boolean;
 }
 
 interface Producto {
@@ -100,7 +118,6 @@ function ProductosPage() {
   const router = useRouter();
   const [productos, setProductos] = useState<Producto[]>([]);
   const [categorias, setCategorias] = useState<Categoria[]>([]);
-  const [_proveedores, setProveedores] = useState<Proveedor[]>([]);
   const [unidadesMedida, setUnidadesMedida] = useState<UnidadMedida[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const debouncedSearchTerm = useDebounce(searchTerm, 500); // Debounce de 500ms
@@ -152,7 +169,7 @@ function ProductosPage() {
       } else {
         setProductos([]);
       }
-    } catch (error) {
+    } catch {
       setProductos([]);
     }
   }, []);
@@ -171,27 +188,8 @@ function ProductosPage() {
       } else {
         setCategorias([]);
       }
-    } catch (error) {
+    } catch {
       setCategorias([]);
-    }
-  }, []);
-
-  // Cargar proveedores
-  const fetchProveedores = useCallback(async () => {
-    try {
-      const response = await api.get('/api/proveedores?activo=true&limit=1000');
-      if (response.ok) {
-        const result = await response.json();
-        if (result.proveedores) {
-          setProveedores(result.proveedores);
-        } else {
-          setProveedores([]);
-        }
-      } else {
-        setProveedores([]);
-      }
-    } catch (error) {
-      setProveedores([]);
     }
   }, []);
 
@@ -205,7 +203,7 @@ function ProductosPage() {
       } else {
         setUnidadesMedida([]);
       }
-    } catch (error) {
+    } catch {
       setUnidadesMedida([]);
     }
   }, []);
@@ -214,10 +212,9 @@ function ProductosPage() {
     if (session) {
       fetchProductos();
       fetchCategorias();
-      fetchProveedores();
       fetchUnidadesMedida();
     }
-  }, [session, fetchProductos, fetchCategorias, fetchProveedores, fetchUnidadesMedida]);
+  }, [session, fetchProductos, fetchCategorias, fetchUnidadesMedida]);
 
   const showToast = (message: string, type: 'success' | 'error') => {
     if (type === 'success') {
@@ -348,10 +345,10 @@ function ProductosPage() {
       return todosLosProductos.filter((producto) => {
         const searchLower = debouncedSearchTerm.toLowerCase();
         return (
-          (producto.descripcion && producto.descripcion.toLowerCase().includes(searchLower)) ||
-          (producto.estado && producto.estado.toLowerCase().includes(searchLower)) ||
-          (producto.clave && producto.clave.toLowerCase().includes(searchLower)) ||
-          (producto.clave2 && producto.clave2.toLowerCase().includes(searchLower))
+          producto.descripcion?.toLowerCase().includes(searchLower) ||
+          producto.estado?.toLowerCase().includes(searchLower) ||
+          producto.clave?.toLowerCase().includes(searchLower) ||
+          producto.clave2?.toLowerCase().includes(searchLower)
         );
       });
     }
@@ -411,9 +408,15 @@ function ProductosPage() {
     const { name, value, type } = e.target;
     const checked = 'checked' in e.target ? e.target.checked : false;
 
+    const getFieldValue = () => {
+      if (type === 'checkbox') return checked;
+      if (type === 'number') return Number(value);
+      return value;
+    };
+
     setFormData((prev) => ({
       ...prev,
-      [name]: type === 'checkbox' ? checked : type === 'number' ? Number(value) : value,
+      [name]: getFieldValue(),
     }));
     setFormErrors((prev) => ({ ...prev, [name]: undefined }));
   };
@@ -444,7 +447,7 @@ function ProductosPage() {
         if (response.status === 401) {
           showToast('Sesión expirada. Por favor, inicia sesión nuevamente.', 'error');
           setTimeout(() => {
-            window.location.href = '/login';
+            globalThis.location.href = '/login';
           }, 2000);
           return;
         } else {
@@ -468,7 +471,7 @@ function ProductosPage() {
       } else {
         showToast(result.error || 'Error al guardar el producto', 'error');
       }
-    } catch (error) {
+    } catch {
       showToast('Error de conexión', 'error');
     } finally {
       setSubmitLoading(false);
@@ -662,18 +665,10 @@ function ProductosPage() {
                 />
               </svg>
               <h3 className="mt-2 text-sm font-medium text-gray-900">
-                {!showAll && searchTerm.trim() === ''
-                  ? 'Selecciona una opción para ver productos'
-                  : searchTerm.trim() !== ''
-                    ? 'No se encontraron productos con esa búsqueda'
-                    : 'No hay productos registrados'}
+                {getEmptyStateTitle(showAll, searchTerm)}
               </h3>
               <p className="mt-1 text-sm text-gray-500">
-                {!showAll && searchTerm.trim() === ''
-                  ? "Marca 'Mostrar todos los productos' o busca por nombre/descripción"
-                  : searchTerm.trim() !== ''
-                    ? 'Intenta con otros términos de búsqueda'
-                    : 'Comience creando un nuevo producto.'}
+                {getEmptyStateDescription(showAll, searchTerm)}
               </p>
             </div>
           ) : (
@@ -724,13 +719,7 @@ function ProductosPage() {
                         </div>
                         <div className="text-center">
                           <span
-                            className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                              producto.estado === 'DISPONIBLE'
-                                ? 'bg-green-100 text-green-800'
-                                : producto.estado === 'AGOTADO'
-                                  ? 'bg-yellow-100 text-yellow-800'
-                                  : 'bg-red-100 text-red-800'
-                            }`}
+                            className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getEstadoClassName(producto.estado)}`}
                           >
                             {producto.estado || 'DISPONIBLE'}
                           </span>
@@ -1169,7 +1158,7 @@ function ProductosPage() {
                             htmlFor="punto_reorden"
                             className="block text-sm font-semibold text-gray-700 mb-2"
                           >
-                            Punto de Reorden *
+                            Punto de Reorden *{' '}
                             <span className="text-xs text-gray-500 ml-2">
                               (Alerta de reabastecimiento)
                             </span>
@@ -1203,7 +1192,7 @@ function ProductosPage() {
                             htmlFor="cantidad_maxima"
                             className="block text-sm font-semibold text-gray-700 mb-2"
                           >
-                            Cantidad Máxima
+                            Cantidad Máxima{' '}
                             <span className="text-xs text-gray-500 ml-2">(Límite de stock)</span>
                           </label>
                           <input
@@ -1458,7 +1447,7 @@ function ProductosPage() {
                                     } else {
                                       throw new Error('Error al procesar la imagen');
                                     }
-                                  } catch (error) {
+                                  } catch {
                                     toast.error('Error al subir la imagen');
                                   }
                                 }
