@@ -28,6 +28,10 @@ export async function GET(request: NextRequest) {
     const whereCondition: any = {
       fecha_vencimiento: { not: null },
       cantidad_disponible: { gt: 0 },
+      // 🔧 Solo productos activos (filtrar por relación con Inventario)
+      Inventario: {
+        estado: { notIn: ['DESCONTINUADO', 'descontinuado'] },
+      },
     };
 
     if (tipo === 'vencidos') {
@@ -139,6 +143,7 @@ export async function POST(_request: NextRequest) {
     treintaDiasDespues.setDate(ahora.getDate() + 30);
 
     // Contar productos vencidos
+    // 🔧 Solo productos activos
     const vencidos = await prisma.partidas_entrada_inventario.count({
       where: {
         fecha_vencimiento: {
@@ -146,10 +151,14 @@ export async function POST(_request: NextRequest) {
           lt: ahora,
         },
         cantidad_disponible: { gt: 0 },
+        Inventario: {
+          estado: { notIn: ['DESCONTINUADO', 'descontinuado'] },
+        },
       },
     });
 
     // Contar productos próximos a vencer (30 días)
+    // 🔧 Solo productos activos
     const proximosVencer = await prisma.partidas_entrada_inventario.count({
       where: {
         fecha_vencimiento: {
@@ -157,6 +166,9 @@ export async function POST(_request: NextRequest) {
           lte: treintaDiasDespues,
         },
         cantidad_disponible: { gt: 0 },
+        Inventario: {
+          estado: { notIn: ['DESCONTINUADO', 'descontinuado'] },
+        },
       },
     });
 

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, use } from 'react';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/fetcher';
 
@@ -34,7 +34,12 @@ const showToast = (message: string, _type: 'success' | 'error' | 'info' = 'info'
   alert(message);
 };
 
-export default function RolePermissionsPage({ params }: { params: { id: string } }) {
+export default function RolePermissionsPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const resolvedParams = use(params);
   const router = useRouter();
   const [data, setData] = useState<RolePermissionsData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -47,7 +52,7 @@ export default function RolePermissionsPage({ params }: { params: { id: string }
   const fetchRolePermissions = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await api.get(`/api/rbac/roles/${params.id}/permissions`);
+      const response = await api.get(`/api/rbac/roles/${resolvedParams.id}/permissions`);
 
       if (!response.ok) {
         throw new Error('Error al cargar permisos del rol');
@@ -72,7 +77,7 @@ export default function RolePermissionsPage({ params }: { params: { id: string }
     } finally {
       setLoading(false);
     }
-  }, [params.id]);
+  }, [resolvedParams.id]);
 
   useEffect(() => {
     fetchRolePermissions();
@@ -100,7 +105,7 @@ export default function RolePermissionsPage({ params }: { params: { id: string }
 
       // Asignar nuevos permisos
       if (toAssign.length > 0) {
-        const assignResponse = await api.post(`/api/rbac/roles/${params.id}/permissions`, {
+        const assignResponse = await api.post(`/api/rbac/roles/${resolvedParams.id}/permissions`, {
           permission_ids: toAssign,
         });
 
@@ -111,7 +116,7 @@ export default function RolePermissionsPage({ params }: { params: { id: string }
 
       // Revocar permisos
       if (toRevoke.length > 0) {
-        const revokeResponse = await api.del(`/api/rbac/roles/${params.id}/permissions`, {
+        const revokeResponse = await api.del(`/api/rbac/roles/${resolvedParams.id}/permissions`, {
           body: JSON.stringify({ permission_ids: toRevoke }),
         });
 

@@ -26,8 +26,10 @@ export async function GET(request: NextRequest) {
 
     if (tipo === 'agotados') {
       // Agotados: cantidad <= 0 (igual que el reporte)
+      // 🔧 Solo productos activos (estado != DESCONTINUADO)
       const whereCondition = {
         cantidad: { lte: 0 },
+        estado: { notIn: ['DESCONTINUADO', 'descontinuado'] },
       };
 
       const [productos, total] = await Promise.all([
@@ -91,6 +93,7 @@ export async function GET(request: NextRequest) {
           WHERE cantidad > 0 
             AND punto_reorden > 0
             AND cantidad <= punto_reorden
+            AND estado NOT IN ('DESCONTINUADO', 'descontinuado')
           ORDER BY cantidad ASC, descripcion ASC
           LIMIT ${limit} OFFSET ${skip}
         `,
@@ -102,6 +105,7 @@ export async function GET(request: NextRequest) {
           WHERE cantidad > 0 
             AND punto_reorden > 0
             AND cantidad <= punto_reorden
+            AND estado NOT IN ('DESCONTINUADO', 'descontinuado')
         `,
       ]);
 
@@ -143,6 +147,7 @@ export async function GET(request: NextRequest) {
           FROM "Inventario"
           WHERE cantidad_maxima > 0 
             AND cantidad >= cantidad_maxima
+            AND estado NOT IN ('DESCONTINUADO', 'descontinuado')
           ORDER BY cantidad DESC, descripcion ASC
           LIMIT ${limit} OFFSET ${skip}
         `,
@@ -153,6 +158,7 @@ export async function GET(request: NextRequest) {
           FROM "Inventario"
           WHERE cantidad_maxima > 0 
             AND cantidad >= cantidad_maxima
+            AND estado NOT IN ('DESCONTINUADO', 'descontinuado')
         `,
       ]);
 
@@ -209,17 +215,21 @@ export async function POST(_request: NextRequest) {
     }
 
     // Contar productos agotados (cantidad <= 0)
+    // 🔧 Solo productos activos (estado no DESCONTINUADO)
     const agotados = await prisma.inventario.count({
       where: {
         cantidad: { lte: 0 },
+        estado: { notIn: ['DESCONTINUADO', 'descontinuado'] },
       },
     });
 
     // Para productos por agotarse, necesitamos obtener todos con cantidad > 0
     // y filtrar según punto_reorden o cantidad_minima
+    // 🔧 Solo productos activos
     const productosConStock = await prisma.inventario.findMany({
       where: {
         cantidad: { gt: 0 },
+        estado: { notIn: ['DESCONTINUADO', 'descontinuado'] },
       },
       select: {
         cantidad: true,
@@ -236,9 +246,11 @@ export async function POST(_request: NextRequest) {
     }).length;
 
     // Para productos con exceso de stock, necesitamos obtener todos con cantidad_maxima > 0
+    // 🔧 Solo productos activos
     const productosConMaximo = await prisma.inventario.findMany({
       where: {
         cantidad_maxima: { gt: 0 },
+        estado: { notIn: ['DESCONTINUADO', 'descontinuado'] },
       },
       select: {
         cantidad: true,

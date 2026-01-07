@@ -7,9 +7,9 @@ import DynamicReportPage from '@/app/components/DynamicReportPage';
 import { TipoRol } from '@/lib/tipo-rol';
 
 interface ReportPageProps {
-  params: {
+  params: Promise<{
     slug: string;
-  };
+  }>;
 }
 
 async function getReportConfig(slug: string) {
@@ -33,13 +33,14 @@ async function getReportConfig(slug: string) {
 }
 
 export default async function ReportPage({ params }: ReportPageProps) {
+  const { slug } = await params;
   const session = await getServerSession(authOptions);
 
   if (!session?.user) {
     notFound();
   }
 
-  const reportConfig = await getReportConfig(params.slug);
+  const reportConfig = await getReportConfig(slug);
 
   if (!reportConfig) {
     notFound();
@@ -74,7 +75,8 @@ export default async function ReportPage({ params }: ReportPageProps) {
 
 // Generar metadata dinámicamente
 export async function generateMetadata({ params }: ReportPageProps) {
-  const reportConfig = await getReportConfig(params.slug);
+  const { slug } = await params;
+  const reportConfig = await getReportConfig(slug);
 
   if (!reportConfig) {
     return {
