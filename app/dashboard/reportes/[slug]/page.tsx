@@ -1,10 +1,10 @@
-import { notFound } from 'next/navigation';
-import { prisma } from '@/lib/prisma';
-import { getServerSession } from 'next-auth/next';
-import { authOptions } from '@/lib/auth';
-import ProtectedPage from '@/app/components/ProtectedPage';
 import DynamicReportPage from '@/app/components/DynamicReportPage';
+import ProtectedPage from '@/app/components/ProtectedPage';
+import { authOptions } from '@/lib/auth';
+import { prisma } from '@/lib/prisma';
 import { TipoRol } from '@/lib/tipo-rol';
+import { getServerSession } from 'next-auth/next';
+import { notFound } from 'next/navigation';
 
 interface ReportPageProps {
   params: Promise<{

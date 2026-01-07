@@ -102,6 +102,14 @@ export default function ReporteCategoriasStock() {
   // Filtrar productos
   const productosFiltrados = useMemo(() => {
     return productos.filter((producto) => {
+      // 🔧 Excluir productos desactivados (DESCONTINUADO)
+      if (
+        producto.estado === 'DESCONTINUADO' ||
+        producto.estado === 'descontinuado'
+      ) {
+        return false;
+      }
+
       // Filtro por categoría
       if (filtros.categoria_id && producto.categoria_id !== filtros.categoria_id) {
         return false;
