@@ -1,10 +1,10 @@
 import bcrypt from 'bcryptjs';
 import CredentialsProvider from 'next-auth/providers/credentials';
+import { logger } from './logger';
 import { prisma } from './prisma';
 import { deriveUserRoles } from './rbac/derive-user-roles';
 import { registerActiveSession, removeAllUserSessions } from './sessionTracker';
 import { validateUserLogin } from './userLicense';
-import { logger } from './logger';
 
 /**
  * Actualiza el token con datos de la BD

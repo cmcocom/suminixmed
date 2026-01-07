@@ -1,6 +1,6 @@
-import { prisma } from './prisma';
 import { randomUUID } from 'node:crypto';
 import { logger } from './logger';
+import { prisma } from './prisma';
 
 async function notifySessionChange(
   operation: 'INSERT' | 'UPDATE' | 'DELETE',

@@ -1,6 +1,6 @@
-import { ALL_MODULES } from './rbac-modules';
-import { prisma } from './prisma';
 import { logger } from './logger';
+import { prisma } from './prisma';
+import { ALL_MODULES } from './rbac-modules';
 
 const ROUTE_MODULE_MAP: Record<string, string> = {
   '/dashboard': 'DASHBOARD',
