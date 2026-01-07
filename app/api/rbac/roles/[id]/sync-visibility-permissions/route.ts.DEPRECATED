@@ -1,0 +1,280 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { getServerSession } from 'next-auth/next';
+import { authOptions } from '@/lib/auth';
+import { prisma } from '@/lib/prisma';
+
+function normalizeModuleKey(k: string | undefined | null) {
+  if (!k) return k;
+  return String(k)
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, '_')
+    .replace(/_+/g, '_')
+    .replace(/^_+|_+$/g, '');
+}
+
+/**
+ * PUT /api/rbac/roles/[id]/sync-visibility-permissions
+ * 
+ * Sincroniza visibilidad y permisos LEER automáticamente:
+ * - Si visible: true → Asigna permiso LEER al rol
+ * - Si visible: false → Elimina permiso LEER del rol
+ * 
+ * Body: { visibility: { MODULE_KEY: boolean, ... } }
+ */
+export async function PUT(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user) {
+      return NextResponse.json({ error: 'No autenticado' }, { status: 401 });
+    }
+
+    const resolvedParams = await params;
+    const roleId = resolvedParams.id;
+    const body = await request.json();
+    const { visibility } = body;
+
+    if (!visibility || typeof visibility !== 'object') {
+      return NextResponse.json({ 
+        error: 'El campo visibility es requerido y debe ser un objeto' 
+      }, { status: 400 });
+    }
+
+    // Verificar que el rol existe
+    const role = await prisma.rbac_roles.findUnique({
+      where: { id: roleId },
+      select: { id: true, name: true }
+    });
+
+    if (!role) {
+      return NextResponse.json({ error: 'Rol no encontrado' }, { status: 404 });
+    }
+
+    // Usar transacción para garantizar consistencia total
+    const result = await prisma.$transaction(async (tx) => {
+      const updatedModules = [];
+      const errors = [];
+
+      for (const [moduleKeyRaw, visible] of Object.entries(visibility)) {
+        const moduleKey = normalizeModuleKey(moduleKeyRaw);
+        if (!moduleKey) {
+          errors.push(`${moduleKeyRaw}: moduleKey inválido`);
+          continue;
+        }
+        if (typeof visible !== 'boolean') {
+          errors.push(`${moduleKey}: valor debe ser booleano`);
+          continue;
+        }
+
+        try {
+          // ====================================
+          // PASO 1: Actualizar VISIBILIDAD
+          // ====================================
+          const existingVisibility = await tx.module_visibility.findFirst({
+            where: {
+              module_key: moduleKey,
+              role_id: roleId,
+              user_id: null
+            }
+          });
+
+          if (existingVisibility) {
+            await tx.module_visibility.update({
+              where: { id: existingVisibility.id },
+              data: { 
+                visible,
+                module_key: moduleKey,
+                updated_at: new Date()
+              }
+            });
+          } else {
+            await tx.module_visibility.create({
+              data: {
+                id: `mv_${roleId}_${moduleKey}_${Date.now()}_${Math.random().toString(36).substr(2,9)}`,
+                module_key: moduleKey,
+                visible,
+                role_id: roleId,
+                user_id: null,
+                created_at: new Date(),
+                updated_at: new Date()
+              }
+            });
+          }
+
+          // ====================================
+          // PASO 2: Sincronizar PERMISO LEER
+          // ====================================
+          
+          // Buscar el permiso LEER para este módulo
+          const leerPermission = await tx.rbac_permissions.findFirst({
+            where: {
+              module: moduleKey,
+              action: 'LEER',
+              is_active: true
+            }
+          });
+
+          if (!leerPermission) {
+            // Si no existe el permiso LEER, lo creamos
+            const newPermission = await tx.rbac_permissions.create({
+              data: {
+                id: `perm_${moduleKey}_LEER_${Date.now()}`,
+                name: `${moduleKey}_LEER`,
+                description: `Permiso para leer/ver el módulo ${moduleKey}`,
+                module: moduleKey,
+                action: 'LEER',
+                is_active: true,
+                created_by: session.user.id || 'system',
+                created_at: new Date(),
+                updated_at: new Date()
+              }
+            });
+
+            // Si el módulo se marca como visible, asignar el nuevo permiso
+            if (visible) {
+              await tx.rbac_role_permissions.create({
+                data: {
+                  id: `rp_${roleId}_${newPermission.id}_${Date.now()}`,
+                  role_id: roleId,
+                  permission_id: newPermission.id,
+                  granted: true,
+                  granted_by: session.user.id || 'system',
+                  granted_at: new Date()
+                }
+              });
+            }
+
+            updatedModules.push({
+              moduleKey,
+              visible,
+              permissionAction: visible ? 'created_and_granted' : 'created_only',
+              status: 'synced'
+            });
+          } else {
+            // El permiso LEER existe
+            const existingRolePermission = await tx.rbac_role_permissions.findFirst({
+              where: {
+                role_id: roleId,
+                permission_id: leerPermission.id
+              }
+            });
+
+            if (visible) {
+              // VISIBLE = TRUE → Asegurar que el permiso esté asignado
+              if (!existingRolePermission) {
+                await tx.rbac_role_permissions.create({
+                  data: {
+                    id: `rp_${roleId}_${leerPermission.id}_${Date.now()}`,
+                    role_id: roleId,
+                    permission_id: leerPermission.id,
+                    granted: true,
+                    granted_by: session.user.id || 'system',
+                    granted_at: new Date()
+                  }
+                });
+                updatedModules.push({
+                  moduleKey,
+                  visible: true,
+                  permissionAction: 'granted',
+                  status: 'synced'
+                });
+              } else {
+                // Ya tenía el permiso, solo aseguramos que granted=true
+                if (!existingRolePermission.granted) {
+                  await tx.rbac_role_permissions.update({
+                    where: { id: existingRolePermission.id },
+                    data: {
+                      granted: true,
+                      granted_by: session.user.id || 'system',
+                      granted_at: new Date()
+                    }
+                  });
+                }
+                updatedModules.push({
+                  moduleKey,
+                  visible: true,
+                  permissionAction: 'already_granted',
+                  status: 'synced'
+                });
+              }
+            } else {
+              // VISIBLE = FALSE → Eliminar el permiso si existe
+              if (existingRolePermission) {
+                await tx.rbac_role_permissions.delete({
+                  where: { id: existingRolePermission.id }
+                });
+                updatedModules.push({
+                  moduleKey,
+                  visible: false,
+                  permissionAction: 'revoked',
+                  status: 'synced'
+                });
+              } else {
+                updatedModules.push({
+                  moduleKey,
+                  visible: false,
+                  permissionAction: 'already_revoked',
+                  status: 'synced'
+                });
+              }
+            }
+          }
+
+        } catch (moduleError) {
+          console.error(`Error procesando módulo ${moduleKey}:`, moduleError);
+          errors.push(`${moduleKey}: ${moduleError instanceof Error ? moduleError.message : 'error al sincronizar'}`);
+        }
+      }
+
+      return { updatedModules, errors };
+    });
+
+    // ====================================
+    // PASO 3: Limpiar caché de usuarios afectados
+    // ====================================
+    try {
+      // Obtener todos los usuarios con este rol
+      const usersWithRole = await prisma.rbac_user_roles.findMany({
+        where: { role_id: roleId },
+        select: { user_id: true }
+      });
+
+      const userIds = usersWithRole.map(ur => ur.user_id);
+      
+      // Aquí podrías implementar limpieza de caché si tienes Redis o similar
+      // Por ahora, registramos que necesitan refrescar
+      console.log(`✅ ${userIds.length} usuarios afectados por cambio en rol ${role.name}`);
+      
+    } catch (cacheError) {
+      console.error('Error al limpiar caché:', cacheError);
+      // No bloqueamos la operación por error de caché
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: `✅ Visibilidad y permisos sincronizados para rol "${role.name}"`,
+      roleId,
+      roleName: role.name,
+      updatedModules: result.updatedModules,
+      errors: result.errors,
+      totalSynced: result.updatedModules.length,
+      summary: {
+        granted: result.updatedModules.filter(m => m.permissionAction?.includes('granted')).length,
+        revoked: result.updatedModules.filter(m => m.permissionAction === 'revoked').length,
+        unchanged: result.updatedModules.filter(m => m.permissionAction?.includes('already')).length
+      }
+    });
+
+  } catch (error) {
+    console.error('Error en sync-visibility-permissions:', error);
+    return NextResponse.json(
+      { 
+        error: 'Error interno del servidor',
+        details: error instanceof Error ? error.message : 'Error desconocido'
+      },
+      { status: 500 }
+    );
+  }
+}

@@ -1,0 +1,23 @@
+# Archivos y carpetas que Next.js debe ignorar durante la compilación
+
+# Scripts temporales
+*.mjs
+*.sql
+
+# Documentación (excepto README)
+*.md
+!README.md
+!CHANGELOG.md
+
+# Scripts de desarrollo
+scripts/
+docs/
+
+# Archivos de prueba
+test-*.js
+debug-*.js
+cleanup-*.js
+
+# Archivos de análisis
+analisis-*.mjs
+check-*.mjs

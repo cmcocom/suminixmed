@@ -1,0 +1,502 @@
+'use client';
+
+import { useState, useEffect, useRef, forwardRef, useImperativeHandle } from 'react';
+import { api } from '@/lib/fetcher';
+import { Producto } from '../types';
+import { ExclamationTriangleIcon } from '@heroicons/react/24/outline';
+
+interface SelectorProductoProps {
+  onSelect: (producto: Producto) => void;
+  productosExcluidos?: string[];
+  validarStock?: boolean; // Nueva prop para validar stock en salidas
+  productoSeleccionado?: Producto | null; // Nuevo: Para mostrar el producto seleccionado
+  mostrarProductoSeleccionado?: boolean; // Nueva prop: controlar si se muestra el cuadro del producto seleccionado
+}
+
+const SelectorProducto = forwardRef<HTMLInputElement, SelectorProductoProps>(
+  ({ onSelect, productosExcluidos = [], validarStock = false, productoSeleccionado = null, mostrarProductoSeleccionado = true }, ref) => {
+    const [searchTerm, setSearchTerm] = useState('');
+    const [productos, setProductos] = useState<Producto[]>([]);
+    const [productosDuplicados, setProductosDuplicados] = useState<Producto[]>([]);
+    const [productosSinStock, setProductosSinStock] = useState<Producto[]>([]);
+    const [loading, setLoading] = useState(false);
+    const [showDropdown, setShowDropdown] = useState(false);
+    const [errorBusqueda, setErrorBusqueda] = useState<string | null>(null);
+    const [buscarPorDescripcion, setBuscarPorDescripcion] = useState(false); // Nuevo: Modo de búsqueda
+    const inputRef = useRef<HTMLInputElement>(null);
+
+    // Exponer la ref del input al componente padre
+    useImperativeHandle(ref, () => inputRef.current as HTMLInputElement);
+
+  // Usar directamente el array de excluidos (la prop viene del padre)
+  // Si el padre pasa una nueva referencia, el efecto de búsqueda se re-disparará — esto es aceptable.
+  const productosExcluidosMemo = productosExcluidos;
+
+    useEffect(() => {
+      if (searchTerm.length < 2) {
+        setProductos([]);
+        setProductosDuplicados([]);
+        setProductosSinStock([]);
+        setShowDropdown(false);
+        setErrorBusqueda(null);
+        return;
+      }
+
+      const timer = setTimeout(async () => {
+        try {
+          setLoading(true);
+          setErrorBusqueda(null);
+          
+          // Construir URL con modo de búsqueda
+          const mode = buscarPorDescripcion ? 'descripcion' : 'clave';
+          const response = await api.get(
+            `/api/inventario/buscar?q=${encodeURIComponent(searchTerm)}&mode=${mode}`
+          );
+          
+          if (!response.ok) {
+            if (response.status === 404) {
+              setErrorBusqueda('No se encontraron productos');
+            } else {
+              setErrorBusqueda('Error al buscar productos. Intenta nuevamente.');
+            }
+            setProductos([]);
+            setProductosDuplicados([]);
+            setProductosSinStock([]);
+            setShowDropdown(true);
+            return;
+          }
+          
+          const data = await response.json();
+          
+          if (!data.productos || data.productos.length === 0) {
+            setErrorBusqueda('No se encontraron productos con ese criterio');
+            setProductos([]);
+            setProductosDuplicados([]);
+            setProductosSinStock([]);
+            setShowDropdown(true);
+            return;
+          }
+          
+          // Separar productos disponibles, duplicados y sin stock
+          const disponibles: Producto[] = [];
+          const duplicados: Producto[] = [];
+          const sinStock: Producto[] = [];
+          
+          data.productos.forEach((p: Producto) => {
+            // Si ya está excluido (duplicado)
+            if (productosExcluidosMemo.includes(p.id)) {
+              duplicados.push(p);
+            } 
+            // Si es para salidas y necesita validar stock
+            else if (validarStock && p.cantidad <= 0) {
+              sinStock.push(p);
+            } 
+            // Producto disponible
+            else {
+              disponibles.push(p);
+            }
+          });
+          
+          setProductos(disponibles);
+          setProductosDuplicados(duplicados);
+          setProductosSinStock(sinStock);
+          
+          // IMPORTANTE: Limpiar el error si se encontraron productos
+          if (disponibles.length > 0 || duplicados.length > 0 || sinStock.length > 0) {
+            setErrorBusqueda(null);
+          }
+          
+          setShowDropdown(true);
+        } catch (error) {
+          console.error('Error buscando productos:', error);
+          setErrorBusqueda('Error de conexión. Verifica tu red e intenta nuevamente.');
+          setProductos([]);
+          setProductosDuplicados([]);
+          setProductosSinStock([]);
+          setShowDropdown(true);
+        } finally {
+          setLoading(false);
+        }
+      }, 300);
+
+      return () => clearTimeout(timer);
+    }, [searchTerm, productosExcluidosMemo, validarStock, buscarPorDescripcion]);
+
+    const handleSelect = (producto: Producto) => {
+      onSelect(producto);
+      setSearchTerm('');
+      setProductos([]);
+      setProductosDuplicados([]);
+      setShowDropdown(false);
+      // No mantener el foco aquí, lo maneja el componente padre
+    };
+
+    const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+      // SIEMPRE prevenir Enter para evitar submit accidental del formulario
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        e.stopPropagation(); // Previene propagación al form
+        
+        // Solo seleccionar si hay productos disponibles
+        if (productos.length > 0) {
+          handleSelect(productos[0]);
+        }
+        return;
+      }
+      
+      // Escape cierra el dropdown
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        setShowDropdown(false);
+      }
+    };
+
+    return (
+      <div className="space-y-2">
+        {/* Checkbox para alternar modo de búsqueda */}
+        <div className="flex items-center gap-2">
+          <input
+            type="checkbox"
+            id="buscarPorDescripcion"
+            checked={buscarPorDescripcion}
+            onChange={(e) => setBuscarPorDescripcion(e.target.checked)}
+            className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+          />
+          <label htmlFor="buscarPorDescripcion" className="text-sm text-gray-700 cursor-pointer select-none">
+            Buscar por descripción
+          </label>
+          <span className="text-xs text-gray-500">
+            {buscarPorDescripcion ? '(Búsqueda flexible)' : '(Búsqueda exacta por clave)'}
+          </span>
+        </div>
+
+        {/* Contenedor condicional: Si se muestra el producto seleccionado, usar layout de dos columnas */}
+        {mostrarProductoSeleccionado ? (
+          <div className="flex gap-3 items-start">
+            {/* Selector de producto - 45% del ancho */}
+            <div className="relative flex-1" style={{ maxWidth: '45%' }}>
+              <input
+                ref={inputRef}
+                type="text"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                onKeyDown={handleKeyDown}
+                placeholder={
+                  buscarPorDescripcion 
+                    ? "Buscar por descripción del producto..." 
+                    : "Buscar por clave exacta del producto..."
+                }
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+
+              {loading && (
+                <div className="absolute right-3 top-3">
+                  <div className="animate-spin h-5 w-5 border-2 border-blue-500 border-t-transparent rounded-full"></div>
+                </div>
+              )}
+
+        {showDropdown && (productos.length > 0 || productosDuplicados.length > 0 || productosSinStock.length > 0 || (errorBusqueda && productos.length === 0 && productosDuplicados.length === 0 && productosSinStock.length === 0)) && (
+          <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-96 overflow-y-auto">
+            {/* Error de búsqueda - SOLO si NO hay productos */}
+            {errorBusqueda && productos.length === 0 && productosDuplicados.length === 0 && productosSinStock.length === 0 && (
+              <div className="p-4 bg-red-50 border-l-4 border-red-400 rounded-t-lg">
+                <div className="flex items-start gap-2">
+                  <ExclamationTriangleIcon className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-sm font-semibold text-red-900">
+                      {errorBusqueda}
+                    </p>
+                    <p className="text-xs text-red-700 mt-1">
+                      Verifica que el producto exista en el sistema o intenta con otro término de búsqueda.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+            
+            {/* Productos disponibles */}
+            {productos.map((producto) => (
+              <button
+                key={producto.id}
+                onClick={() => handleSelect(producto)}
+                className="w-full px-4 py-2.5 text-left hover:bg-blue-50 focus:bg-blue-50 focus:outline-none border-b border-gray-100 last:border-b-0 transition-colors"
+              >
+                <div className="font-medium text-gray-900">{producto.descripcion}</div>
+                <div className="flex items-center gap-3 mt-1.5">
+                  <span className="text-xs text-gray-500">
+                    {producto.clave || 'Sin clave'}
+                  </span>
+                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                    producto.cantidad > 10 
+                      ? 'bg-green-100 text-green-700' 
+                      : producto.cantidad > 0 
+                      ? 'bg-yellow-100 text-yellow-700' 
+                      : 'bg-red-100 text-red-700'
+                  }`}>
+                    Stock: {producto.cantidad}
+                  </span>
+                  {/* Mostrar precio solo en búsqueda por clave exacta */}
+                  {!buscarPorDescripcion && (
+                    <span className="text-xs text-gray-400">
+                      ${producto.precio.toFixed(2)}
+                    </span>
+                  )}
+                </div>
+              </button>
+            ))}
+            
+            {/* Productos sin stock - Advertencia */}
+            {productosSinStock.length > 0 && (
+              <div className="p-3 bg-gradient-to-r from-red-50 to-orange-50 border-t-2 border-red-300">
+                <div className="flex items-start gap-2">
+                  <ExclamationTriangleIcon className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
+                  <div className="flex-1">
+                    <p className="text-sm font-semibold text-red-900 mb-1">
+                      ⚠️ {productosSinStock.length === 1 
+                        ? 'Producto sin existencia' 
+                        : `${productosSinStock.length} productos sin existencia`}
+                    </p>
+                    <div className="space-y-1.5">
+                      {productosSinStock.map((producto) => (
+                        <div key={producto.id} className="text-xs text-red-800 bg-white/50 rounded px-2 py-1.5 border border-red-200">
+                          <div className="font-medium">{producto.descripcion}</div>
+                          <div className="text-red-600 mt-0.5 flex items-center gap-2">
+                            <span>{producto.clave || 'Sin clave'}</span>
+                            <span className="px-1.5 py-0.5 bg-red-100 rounded text-red-700 font-semibold">
+                              Stock: {producto.cantidad}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    <p className="text-xs text-red-700 mt-2 font-medium">
+                      ⛔ No se puede agregar productos sin existencia a una salida
+                    </p>
+                    <p className="text-xs text-red-600 mt-1 italic">
+                      💡 Realiza una entrada de inventario primero
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+            
+            {/* Productos duplicados - Mensaje de alerta elegante */}
+            {productosDuplicados.length > 0 && (
+              <div className="p-3 bg-gradient-to-r from-amber-50 to-orange-50 border-t-2 border-amber-300">
+                <div className="flex items-start gap-2">
+                  <ExclamationTriangleIcon className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                  <div className="flex-1">
+                    <p className="text-sm font-semibold text-amber-900 mb-1">
+                      {productosDuplicados.length === 1 
+                        ? 'Producto ya agregado' 
+                        : `${productosDuplicados.length} productos ya agregados`}
+                    </p>
+                    <div className="space-y-1.5">
+                      {productosDuplicados.map((producto) => (
+                        <div key={producto.id} className="text-xs text-amber-800 bg-white/50 rounded px-2 py-1.5 border border-amber-200">
+                          <div className="font-medium">{producto.descripcion}</div>
+                          <div className="text-amber-600 mt-0.5">
+                            {producto.clave || 'Sin clave'} • Ya está en la lista de partidas
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    <p className="text-xs text-amber-700 mt-2 italic">
+                      💡 Edita la cantidad directamente en la tabla
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+            </div>
+
+            {/* Producto seleccionado - 55% del ancho - SOLO si mostrarProductoSeleccionado es true */}
+            {mostrarProductoSeleccionado && (
+              <div className="flex-1" style={{ maxWidth: '55%' }}>
+                {productoSeleccionado ? (
+                  <div className="p-3 bg-gradient-to-br from-blue-50 to-blue-100 border-2 border-blue-300 rounded-lg h-full">
+                    <p className="text-xs font-semibold text-blue-900 mb-1">✓ Producto Seleccionado</p>
+                    <p className="text-sm font-medium text-gray-900 line-clamp-2" title={productoSeleccionado.descripcion}>
+                      {productoSeleccionado.descripcion}
+                    </p>
+                    <div className="mt-2 space-y-1">
+                      {productoSeleccionado.clave && (
+                        <p className="text-xs text-gray-600">
+                          <span className="font-medium">Clave:</span> {productoSeleccionado.clave}
+                        </p>
+                      )}
+                      <p className="text-xs text-gray-600">
+                        <span className="font-medium">Stock:</span>{' '}
+                        <span className={`font-bold ${
+                          productoSeleccionado.cantidad > 10 
+                            ? 'text-green-600' 
+                            : productoSeleccionado.cantidad > 0 
+                            ? 'text-yellow-600' 
+                            : 'text-red-600'
+                        }`}>
+                          {productoSeleccionado.cantidad}
+                        </span>
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="p-3 border-2 border-dashed border-gray-300 rounded-lg h-full flex items-center justify-center bg-gray-50">
+                    <p className="text-xs text-gray-400 text-center">
+                      Ningún producto seleccionado
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        ) : (
+          /* Layout simple: Solo el selector sin el producto seleccionado */
+          <div className="relative w-full">
+            <input
+              ref={inputRef}
+              type="text"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder={
+                buscarPorDescripcion 
+                  ? "Buscar por descripción del producto..." 
+                  : "Buscar por clave exacta del producto..."
+              }
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+
+            {loading && (
+              <div className="absolute right-3 top-3">
+                <div className="animate-spin h-5 w-5 border-2 border-blue-500 border-t-transparent rounded-full"></div>
+              </div>
+            )}
+
+            {showDropdown && (productos.length > 0 || productosDuplicados.length > 0 || productosSinStock.length > 0 || (errorBusqueda && productos.length === 0 && productosDuplicados.length === 0 && productosSinStock.length === 0)) && (
+              <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-96 overflow-y-auto">
+                {/* Error de búsqueda - SOLO si NO hay productos */}
+                {errorBusqueda && productos.length === 0 && productosDuplicados.length === 0 && productosSinStock.length === 0 && (
+                  <div className="p-4 bg-red-50 border-l-4 border-red-400 rounded-t-lg">
+                    <div className="flex items-start gap-2">
+                      <ExclamationTriangleIcon className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
+                      <div>
+                        <p className="text-sm font-semibold text-red-900">
+                          {errorBusqueda}
+                        </p>
+                        <p className="text-xs text-red-700 mt-1">
+                          Verifica que el producto exista en el sistema o intenta con otro término de búsqueda.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                
+                {/* Productos disponibles */}
+                {productos.map((producto) => (
+                  <button
+                    key={producto.id}
+                    onClick={() => handleSelect(producto)}
+                    className="w-full px-4 py-2.5 text-left hover:bg-blue-50 focus:bg-blue-50 focus:outline-none border-b border-gray-100 last:border-b-0 transition-colors"
+                  >
+                    <div className="font-medium text-gray-900">{producto.descripcion}</div>
+                    <div className="flex items-center gap-3 mt-1.5">
+                      <span className="text-xs text-gray-500">
+                        {producto.clave || 'Sin clave'}
+                      </span>
+                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                        producto.cantidad > 10 
+                          ? 'bg-green-100 text-green-700' 
+                          : producto.cantidad > 0 
+                          ? 'bg-yellow-100 text-yellow-700' 
+                          : 'bg-red-100 text-red-700'
+                      }`}>
+                        Stock: {producto.cantidad}
+                      </span>
+                      {/* Mostrar precio solo en búsqueda por clave exacta */}
+                      {!buscarPorDescripcion && (
+                        <span className="text-xs text-gray-400">
+                          ${producto.precio.toFixed(2)}
+                        </span>
+                      )}
+                    </div>
+                  </button>
+                ))}
+                
+                {/* Productos sin stock - Advertencia */}
+                {productosSinStock.length > 0 && (
+                  <div className="p-3 bg-gradient-to-r from-red-50 to-orange-50 border-t-2 border-red-300">
+                    <div className="flex items-start gap-2">
+                      <ExclamationTriangleIcon className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
+                      <div className="flex-1">
+                        <p className="text-sm font-semibold text-red-900 mb-1">
+                          ⚠️ {productosSinStock.length === 1 
+                            ? 'Producto sin existencia' 
+                            : `${productosSinStock.length} productos sin existencia`}
+                        </p>
+                        <div className="space-y-1.5">
+                          {productosSinStock.map((producto) => (
+                            <div key={producto.id} className="text-xs text-red-800 bg-white/50 rounded px-2 py-1.5 border border-red-200">
+                              <div className="font-medium">{producto.descripcion}</div>
+                              <div className="text-red-600 mt-0.5 flex items-center gap-2">
+                                <span>{producto.clave || 'Sin clave'}</span>
+                                <span className="px-1.5 py-0.5 bg-red-100 rounded text-red-700 font-semibold">
+                                  Stock: {producto.cantidad}
+                                </span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                        <p className="text-xs text-red-700 mt-2 font-medium">
+                          ⛔ No se puede agregar productos sin existencia a una salida
+                        </p>
+                        <p className="text-xs text-red-600 mt-1 italic">
+                          💡 Realiza una entrada de inventario primero
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                
+                {/* Productos duplicados - Mensaje de alerta elegante */}
+                {productosDuplicados.length > 0 && (
+                  <div className="p-3 bg-gradient-to-r from-amber-50 to-orange-50 border-t-2 border-amber-300">
+                    <div className="flex items-start gap-2">
+                      <ExclamationTriangleIcon className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                      <div className="flex-1">
+                        <p className="text-sm font-semibold text-amber-900 mb-1">
+                          {productosDuplicados.length === 1 
+                            ? 'Producto ya agregado' 
+                            : `${productosDuplicados.length} productos ya agregados`}
+                        </p>
+                        <div className="space-y-1.5">
+                          {productosDuplicados.map((producto) => (
+                            <div key={producto.id} className="text-xs text-amber-800 bg-white/50 rounded px-2 py-1.5 border border-amber-200">
+                              <div className="font-medium">{producto.descripcion}</div>
+                              <div className="text-amber-600 mt-0.5">
+                                {producto.clave || 'Sin clave'} • Ya está en la lista de partidas
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                        <p className="text-xs text-amber-700 mt-2 italic">
+                          💡 Edita la cantidad directamente en la tabla
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  }
+);
+
+SelectorProducto.displayName = 'SelectorProducto';
+
+export default SelectorProducto;
+

@@ -1,0 +1,3 @@
+# Esta carpeta contiene los backups automáticos del sistema
+# Los archivos .backup NO se suben a Git (ver .gitignore)
+# Solo este archivo .gitkeep se mantiene en el repositorio

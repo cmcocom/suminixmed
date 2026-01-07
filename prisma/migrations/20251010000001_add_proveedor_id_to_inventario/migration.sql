@@ -1,0 +1,2 @@
+-- Esta migración está vacía porque se decidió NO agregar proveedor_id a Inventario
+-- El proveedor se maneja en entradas_inventario.proveedor_id

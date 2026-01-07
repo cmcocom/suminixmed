@@ -1,0 +1,13 @@
+id,nombre,descripcion,activo,createdAt,updatedAt
+CAT-006,Material de Curación,Material para curación de heridas,f,2025-10-08 18:35:17.139,2025-10-08 18:35:17.139
+categoria_1760686583773_hhdq21tbn,DCB,Dentro de Cuadro Básico,t,2025-10-17 07:36:23.774,2025-10-17 07:36:23.773
+categoria_1760686606132_zw0ckli5v,FCB,Fuera de Cuadro Básico,t,2025-10-17 07:36:46.133,2025-10-17 07:36:46.132
+CAT-001,Antisépticos y Desinfectantes,Productos para desinfección y antisepsia,f,2025-10-08 18:35:17.139,2025-10-08 18:35:17.139
+cat-dcb-001,Dispositivos de Control Básico,Dispositivos médicos de control básico,f,2025-10-17 10:26:45.242,2025-10-17 10:26:45.241
+CAT-002,Equipos Médicos,Equipos y dispositivos médicos,f,2025-10-08 18:35:17.139,2025-10-08 18:35:17.139
+cat-fcb-001,Farmacia de Control Básico,Productos farmacéuticos de control básico,f,2025-10-17 10:26:45.194,2025-10-17 10:26:45.142
+CAT-003,Material Descartable,Material de uso único,f,2025-10-08 18:35:17.139,2025-10-08 18:35:17.139
+CAT-004,Material Médico,Material médico general,f,2025-10-08 18:35:17.139,2025-10-08 18:35:17.139
+CAT-005,Material Quirúrgico,Instrumental y material para cirugía,f,2025-10-08 18:35:17.139,2025-10-08 18:35:17.139
+CAT-007,Material de Protección,EPP y material de protección,f,2025-10-08 18:35:17.139,2025-10-08 18:35:17.139
+CAT-008,Otros Insumos Médicos,Insumos médicos diversos,f,2025-10-08 18:35:17.139,2025-10-08 18:35:17.139

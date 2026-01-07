@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Limpiar Caché - SuminixMed</title>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      max-width: 600px;
+      margin: 100px auto;
+      padding: 20px;
+      text-align: center;
+    }
+    .success {
+      background: #10b981;
+      color: white;
+      padding: 20px;
+      border-radius: 8px;
+      margin: 20px 0;
+    }
+    button {
+      background: #3b82f6;
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 6px;
+      font-size: 16px;
+      cursor: pointer;
+      margin: 10px;
+    }
+    button:hover {
+      background: #2563eb;
+    }
+    .danger {
+      background: #ef4444;
+    }
+    .danger:hover {
+      background: #dc2626;
+    }
+  </style>
+</head>
+<body>
+  <h1>🧹 Limpieza de Caché</h1>
+  <p>Esta página limpia el localStorage del navegador para forzar una recarga completa de la configuración RBAC.</p>
+  
+  <div id="status"></div>
+  
+  <button onclick="clearCache()">Limpiar Caché</button>
+  <button onclick="clearAndReload()" class="danger">Limpiar y Recargar</button>
+  <button onclick="goToDashboard()">Ir al Dashboard</button>
+
+  <script>
+    function clearCache() {
+      try {
+        localStorage.removeItem('moduleVisibility');
+        localStorage.removeItem('next-auth.session-token');
+        sessionStorage.clear();
+        
+        document.getElementById('status').innerHTML = `
+          <div class="success">
+            ✅ Caché limpiado exitosamente<br>
+            <small>Se ha eliminado: moduleVisibility, session-token</small>
+          </div>
+        `;
+      } catch (error) {
+        document.getElementById('status').innerHTML = `
+          <div style="background: #ef4444; color: white; padding: 20px; border-radius: 8px;">
+            ❌ Error: ${error.message}
+          </div>
+        `;
+      }
+    }
+    
+    function clearAndReload() {
+      clearCache();
+      setTimeout(() => {
+        window.location.href = '/dashboard';
+      }, 1000);
+    }
+    
+    function goToDashboard() {
+      window.location.href = '/dashboard';
+    }
+    
+    // Auto-limpiar al cargar (si viene con query param)
+    if (window.location.search.includes('auto=true')) {
+      clearCache();
+      setTimeout(() => {
+        window.location.href = '/dashboard';
+      }, 2000);
+    }
+  </script>
+</body>
+</html>

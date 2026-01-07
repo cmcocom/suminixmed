@@ -1,0 +1,218 @@
+/**
+ * Página principal de Entradas de Inventario
+ * Refactorizada para mejorar legibilidad y mantenibilidad
+ * 
+ * ESTRUCTURA EXTRAÍDA:
+ * - Tipos e interfaces: ./utils/entradas.types.ts
+ * - Constantes y colores: ./utils/entradas.constants.ts
+ * - Funciones utilitarias: ./utils/entradas.utils.ts
+ * - Hooks de datos: ./hooks/useEntradasData.ts
+ * - Hooks de formulario: ./hooks/useEntradasForm.ts
+ * - Hooks de partidas: ./hooks/usePartidas.ts
+ * - Hooks de drag & drop: ./hooks/useDragAndDrop.ts
+ * - Hooks de navegación: ./hooks/useKeyboardNavigation.ts
+ * - Componentes UI: ./components/
+ */
+
+'use client';
+
+import { useState } from 'react';
+import { useSession } from 'next-auth/react';
+import { PlusIcon } from '@heroicons/react/24/outline';
+
+// Hooks personalizados extraídos
+import { useEntradasData } from './hooks/useEntradasData';
+import { useEntradasForm } from './hooks/useEntradasForm';
+import { usePartidas } from './hooks/usePartidas';
+import { useDragAndDrop } from './hooks/useDragAndDrop';
+import { useKeyboardNavigation } from './hooks/useKeyboardNavigation';
+
+// Componentes extraídos
+import { EntradaModal } from './components/EntradaModal';
+import { EntradasTable } from './components/EntradasTable';
+import { EntradasFilters } from './components/EntradasFilters';
+
+// Utilidades extraídas
+import { filterEntradas, calculatePagination } from './utils/entradas.utils';
+import { PAGINATION_CONFIG } from './utils/entradas.constants';
+
+// --- VERSIÓN REFACTORIZADA ---
+// import type { FormData } from './utils/entradas.types';
+
+export default function EntradasUnificadasPage() {
+  const { data: session } = useSession();
+  // Estado de filtros y paginación
+  const [searchTerm, setSearchTerm] = useState('');
+  const [showAll, setShowAll] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = PAGINATION_CONFIG.ITEMS_PER_PAGE;
+  const [showModal, setShowModal] = useState(false);
+
+  // Datos principales (entradas, inventarios, proveedores, tipos)
+  const {
+    entradas,
+    inventarios,
+    proveedores,
+    tiposEntrada,
+  // loading: loadingData,
+    refetch
+  } = useEntradasData();
+
+  // Lógica de formulario
+  const {
+    formData,
+    formErrors,
+    submitLoading,
+    searchProveedor,
+    setFormData,
+  // setFormErrors,
+    setSearchProveedor,
+    resetForm,
+    handleSubmit,
+  // onTypeChange
+  } = useEntradasForm({
+    tiposEntrada,
+    onSuccess: () => setShowModal(false),
+    onRefetchData: refetch
+  });
+
+  // Lógica de partidas
+  const {
+    partidaActiva,
+    searchProductos,
+    editingProductos,
+    setPartidaActiva,
+    updatePartida,
+    deletePartida,
+    addPartida,
+  // activatePartida,
+  // isActivePartida,
+    setSearchProducto,
+  // clearSearchProducto,
+  // isEditingProducto
+  } = usePartidas({
+    formData,
+    setFormData,
+    inventarios
+  });
+
+  // Drag & Drop
+  const {
+    draggedIndex,
+    dragOverIndex,
+    handleDragStart,
+    handleDragOver,
+    handleDragLeave,
+    handleDrop,
+    handleDragEnd
+  } = useDragAndDrop({
+    formData,
+    setFormData
+  });
+
+  // Navegación con teclado
+  const { handleKeyDown } = useKeyboardNavigation({
+    formData,
+    onAddPartida: addPartida
+  });
+
+  // Filtrado y paginación de entradas
+  const entradasFiltradas = filterEntradas(entradas, searchTerm, showAll);
+  const { totalPages, paginatedEntradas } = calculatePagination(
+    entradasFiltradas,
+    currentPage,
+    itemsPerPage
+  );
+
+  // Renderizado principal
+  if (!session) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Cargando...</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="container mx-auto px-4 py-6">
+      {/* Header */}
+      <div className="mb-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">📥 Entradas de Inventario</h1>
+            <p className="text-gray-600 mt-1">Gestión unificada de todos los tipos de entrada</p>
+          </div>
+          <button
+            onClick={() => setShowModal(true)}
+            className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+            title="Crear nueva entrada de inventario"
+          >
+            <PlusIcon className="w-5 h-5 mr-2" />
+            Nueva Entrada
+          </button>
+        </div>
+      </div>
+
+      {/* Filtros */}
+      <EntradasFilters
+        searchTerm={searchTerm}
+        showAll={showAll}
+        onSearchChange={(value) => {
+          setSearchTerm(value);
+          setCurrentPage(1);
+        }}
+        onShowAllToggle={() => {
+          setShowAll(!showAll);
+          setCurrentPage(1);
+        }}
+      />
+
+      {/* Tabla de entradas */}
+      <EntradasTable
+        entradas={paginatedEntradas}
+        currentPage={currentPage}
+        totalPages={totalPages}
+        itemsPerPage={itemsPerPage}
+        onPageChange={setCurrentPage}
+      />
+
+      {/* Modal de nueva entrada */}
+      <EntradaModal
+        isOpen={showModal}
+        onClose={() => {
+          setShowModal(false);
+          resetForm();
+        }}
+        formData={formData}
+        formErrors={formErrors}
+        tiposEntrada={tiposEntrada}
+        inventarios={inventarios}
+        proveedores={proveedores}
+        onFormDataChange={setFormData}
+        onSubmit={handleSubmit}
+        submitLoading={submitLoading}
+        searchProveedor={searchProveedor}
+        onSearchProveedorChange={setSearchProveedor}
+        partidaActiva={partidaActiva}
+        searchProductos={searchProductos}
+        editingProductos={editingProductos}
+        onPartidaActivate={setPartidaActiva}
+        onPartidaUpdate={updatePartida}
+        onPartidaDelete={deletePartida}
+        onSearchProductoChange={setSearchProducto}
+        onAddPartida={addPartida}
+        onKeyDown={handleKeyDown}
+        draggedIndex={draggedIndex}
+        dragOverIndex={dragOverIndex}
+        onDragStart={handleDragStart}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+        onDragEnd={handleDragEnd}
+      />
+    </div>
+  );
+}

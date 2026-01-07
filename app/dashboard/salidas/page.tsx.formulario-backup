@@ -1,0 +1,336 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { useTiposSalida } from './hooks/useTiposSalida';
+import { useSalidas } from './hooks/useSalidas';
+import SelectorProducto from '../entradas/components/SelectorProducto';
+import FilaPartida from '../entradas/components/FilaPartida';
+import { Producto, PartidaSalida, Cliente } from './types';
+import { ArrowLeftIcon, PlusIcon } from '@heroicons/react/24/outline';
+
+export default function NuevaSalidaPage() {
+  const router = useRouter();
+  const { tipos, loading: loadingTipos } = useTiposSalida();
+  const { createSalida, loading: saving } = useSalidas();
+
+  const [tipoSeleccionado, setTipoSeleccionado] = useState<string>('');
+  const [observaciones, setObservaciones] = useState('');
+  const [referenciaExterna, setReferenciaExterna] = useState('');
+  const [clienteId, setClienteId] = useState('');
+  const [clientes, setClientes] = useState<Cliente[]>([]);
+  const [loadingClientes, setLoadingClientes] = useState(false);
+  const [partidas, setPartidas] = useState<PartidaSalida[]>([]);
+  const [error, setError] = useState<string | null>(null);
+
+  // Obtener el tipo seleccionado
+  const tipoActual = tipos.find(t => t.id === tipoSeleccionado);
+
+  // Cargar clientes cuando sea necesario
+  useEffect(() => {
+    if (tipoActual?.requiere_cliente) {
+      const fetchClientes = async () => {
+        try {
+          setLoadingClientes(true);
+          const response = await fetch('/api/clientes?activo=true&limit=1000');
+          if (response.ok) {
+            const result = await response.json();
+            // El API devuelve { success: true, data: [...] }
+            setClientes(Array.isArray(result.data) ? result.data : []);
+          }
+        } catch (err) {
+          console.error('Error al cargar clientes:', err);
+          setClientes([]);
+        } finally {
+          setLoadingClientes(false);
+        }
+      };
+
+      fetchClientes();
+    }
+  }, [tipoActual?.requiere_cliente]);
+
+  const handleAgregarProducto = (producto: Producto) => {
+    const nuevaPartida: PartidaSalida = {
+      id: crypto.randomUUID(),
+      producto,
+      cantidad: 1,
+      precio: producto.precio,
+      subtotal: producto.precio,
+    };
+    setPartidas([...partidas, nuevaPartida]);
+  };
+
+  const handleActualizarPartida = (index: number, cantidad: number, precio: number) => {
+    const nuevasPartidas = [...partidas];
+    nuevasPartidas[index] = {
+      ...nuevasPartidas[index],
+      cantidad,
+      precio,
+      subtotal: cantidad * precio,
+    };
+    setPartidas(nuevasPartidas);
+  };
+
+  const handleRemoverPartida = (index: number) => {
+    setPartidas(partidas.filter((_, i) => i !== index));
+  };
+
+  const calcularTotal = () => {
+    return partidas.reduce((sum, p) => sum + p.subtotal, 0);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+
+    // Validaciones
+    if (!tipoSeleccionado) {
+      setError('Debe seleccionar un tipo de salida');
+      return;
+    }
+
+    if (partidas.length === 0) {
+      setError('Debe agregar al menos un producto');
+      return;
+    }
+
+    // Validar campos condicionales
+    if (tipoActual?.requiere_cliente && !clienteId) {
+      setError('Debe seleccionar un cliente');
+      return;
+    }
+
+    if (tipoActual?.requiere_referencia && !referenciaExterna.trim()) {
+      setError('Debe ingresar una referencia/folio externo');
+      return;
+    }
+
+    try {
+      await createSalida({
+        tipo_salida_id: tipoSeleccionado,
+        observaciones: observaciones.trim() || undefined,
+        referencia_externa: tipoActual?.requiere_referencia ? referenciaExterna.trim() : undefined,
+        cliente_id: tipoActual?.requiere_cliente ? clienteId : undefined,
+        partidas: partidas.map(p => ({
+          producto_id: p.producto.id,
+          cantidad: p.cantidad,
+          precio: p.precio,
+        })),
+      });
+    } catch (err) {
+      // El error ya se maneja en el hook
+      console.error('Error al guardar:', err);
+    }
+  };
+
+  if (loadingTipos) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-gray-500">Cargando tipos de salida...</div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center space-x-3">
+          <button
+            type="button"
+            onClick={() => router.back()}
+            className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+            title="Volver"
+            aria-label="Volver a la lista de salidas"
+          >
+            <ArrowLeftIcon className="h-5 w-5" />
+          </button>
+          <h1 className="text-2xl font-bold text-gray-900">Nueva Salida de Inventario</h1>
+        </div>
+      </div>
+
+      {/* Formulario */}
+      <form onSubmit={handleSubmit} className="space-y-6">
+        {/* Error general */}
+        {error && (
+          <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg">
+            {error}
+          </div>
+        )}
+
+        {/* Información General */}
+        <div className="bg-white shadow rounded-lg p-6">
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">Información General</h2>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Tipo de Salida */}
+            <div className="col-span-full">
+              <label htmlFor="tipo" className="block text-sm font-medium text-gray-700 mb-2">
+                Tipo de Salida *
+              </label>
+              <select
+                id="tipo"
+                value={tipoSeleccionado}
+                onChange={(e) => {
+                  setTipoSeleccionado(e.target.value);
+                  // Limpiar campos condicionales al cambiar tipo
+                  setClienteId('');
+                  setReferenciaExterna('');
+                }}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                required
+              >
+                <option value="">Seleccione un tipo de salida</option>
+                {tipos.map((tipo) => (
+                  <option key={tipo.id} value={tipo.id}>
+                    {tipo.nombre}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Campo de Cliente (condicional) */}
+            {tipoActual?.requiere_cliente && (
+              <div className="col-span-full">
+                <label htmlFor="cliente" className="block text-sm font-medium text-gray-700 mb-2">
+                  Cliente *
+                  <span className="text-xs text-gray-500 ml-2">
+                    (Requerido para {tipoActual.nombre})
+                  </span>
+                </label>
+                <select
+                  id="cliente"
+                  value={clienteId}
+                  onChange={(e) => setClienteId(e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  required
+                  disabled={loadingClientes}
+                >
+                  <option value="">
+                    {loadingClientes ? 'Cargando clientes...' : 'Seleccione un cliente'}
+                  </option>
+                  {clientes.map((cli) => (
+                    <option key={cli.id} value={cli.id}>
+                      {cli.clave ? `${cli.clave} - ` : ''}{cli.nombre}{cli.empresa ? ` (${cli.empresa})` : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {/* Campo de Referencia Externa (condicional) */}
+            {tipoActual?.requiere_referencia && (
+              <div className="col-span-full">
+                <label htmlFor="referencia" className="block text-sm font-medium text-gray-700 mb-2">
+                  Referencia/Folio Externo * 
+                  <span className="text-xs text-gray-500 ml-2">
+                    (Número de orden, folio, etc.)
+                  </span>
+                </label>
+                <input
+                  type="text"
+                  id="referencia"
+                  value={referenciaExterna}
+                  onChange={(e) => setReferenciaExterna(e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="Ej: ORD-2024-001, FAC-123"
+                  required
+                  maxLength={100}
+                />
+              </div>
+            )}
+
+            {/* Observaciones */}
+            <div className="col-span-full">
+              <label htmlFor="observaciones" className="block text-sm font-medium text-gray-700 mb-2">
+                Observaciones
+              </label>
+              <textarea
+                id="observaciones"
+                value={observaciones}
+                onChange={(e) => setObservaciones(e.target.value)}
+                rows={3}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="Información adicional sobre esta salida..."
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Productos */}
+        <div className="bg-white shadow rounded-lg p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold text-gray-900">Productos</h2>
+            <SelectorProducto onSelect={handleAgregarProducto} />
+          </div>
+
+          {partidas.length === 0 ? (
+            <div className="text-center py-12 text-gray-500">
+              <PlusIcon className="h-12 w-12 mx-auto mb-3 text-gray-400" />
+              <p>No hay productos agregados</p>
+              <p className="text-sm">Use el selector para agregar productos a la salida</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {/* Tabla de productos */}
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">Producto</th>
+                      <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">Cantidad</th>
+                      <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">Precio</th>
+                      <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">Subtotal</th>
+                      <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {partidas.map((partida, index) => (
+                      <FilaPartida
+                        key={partida.id}
+                        partida={partida}
+                        index={index}
+                        onUpdate={handleActualizarPartida}
+                        onRemove={handleRemoverPartida}
+                      />
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              
+              {/* Total */}
+              <div className="border-t pt-4">
+                <div className="flex justify-end items-center space-x-4">
+                  <span className="text-lg font-semibold text-gray-700">Total:</span>
+                  <span className="text-2xl font-bold text-blue-600">
+                    ${calcularTotal().toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Botones */}
+        <div className="flex justify-end space-x-3">
+          <button
+            type="button"
+            onClick={() => router.back()}
+            className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+            disabled={saving}
+          >
+            Cancelar
+          </button>
+          <button
+            type="submit"
+            disabled={saving || partidas.length === 0}
+            className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            {saving ? 'Guardando...' : 'Guardar Salida'}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}

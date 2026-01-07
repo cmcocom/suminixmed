@@ -1,0 +1,49 @@
+{
+  "fecha": "2025-12-17T18:48:07.387Z",
+  "usuarios": {
+    "total": 127,
+    "activos": 127
+  },
+  "clientes": {
+    "total": 211,
+    "activos": 211
+  },
+  "proveedores": {
+    "total": 6,
+    "activos": 4
+  },
+  "empleados": {
+    "total": 123,
+    "activos": 123
+  },
+  "categorias": {
+    "total": 12,
+    "activas": 2
+  },
+  "inventario": 514,
+  "entradas": {
+    "total": 565,
+    "partidas": 1548,
+    "ultimoFolio": "569"
+  },
+  "salidas": {
+    "total": 2467,
+    "partidas": 29916,
+    "ultimoFolio": "2618"
+  },
+  "ordenesCompra": {
+    "total": 0,
+    "activas": 0
+  },
+  "inventariosFisicos": 0,
+  "activoFijo": {
+    "total": 0,
+    "activos": 0
+  },
+  "auditoria": 25449,
+  "rbac": {
+    "roles": 4,
+    "permisos": 195,
+    "asignaciones": 14
+  }
+}

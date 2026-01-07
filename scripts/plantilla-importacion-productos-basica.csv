@@ -1,0 +1,11 @@
+nombre,categoria,cantidad,precio,proveedor,cantidad_minima,punto_reorden
+Aspirina 500mg,Medicamentos,100,25.50,Pharma SA,10,20
+Paracetamol 100mg,Medicamentos,200,15.00,Medic Corp,15,30
+Ibuprofeno 400mg,Medicamentos,150,35.00,Pharma SA,20,40
+Amoxicilina 500mg,Medicamentos,80,45.00,BioMed Labs,5,15
+Dipirona 1g,Medicamentos,120,22.00,Pharma SA,10,25
+Gel Antibacterial 500ml,Higiene,300,25.00,Clean Corp,50,100
+Cubrebocas N95,Protección,500,8.50,SafetyPro,100,200
+Guantes Latex Caja 100,Protección,200,120.00,MedSupply,20,50
+Termómetro Digital,Equipos,50,180.00,TechMed,5,10
+Oxímetro de Pulso,Equipos,30,250.00,TechMed,3,8

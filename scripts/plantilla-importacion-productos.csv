@@ -1,0 +1,6 @@
+clave,clave2,nombre,descripcion,categoria,cantidad,precio,proveedor,fecha_ingreso,fecha_vencimiento,estado,codigo_barras,numero_lote,cantidad_minima,cantidad_maxima,punto_reorden,dias_reabastecimiento,ubicacion_general,imagen
+ASP-001,MED-001,Aspirina 500mg,Analgésico y antipirético,Medicamentos,100,25.50,Pharma SA,2025-01-15,2026-12-31,disponible,7501234567890,LOTE-2025-001,10,500,20,7,Anaquel A-1,/images/aspirina.jpg
+PAR-002,MED-002,Paracetamol 100mg,Antipirético para fiebre y dolor,Medicamentos,200,15.00,Medic Corp,2025-02-01,2026-06-30,disponible,7501234567891,LOTE-2025-002,15,1000,30,14,Anaquel A-2,
+IBU-003,MED-003,Ibuprofeno 400mg,Antiinflamatorio no esteroideo,Medicamentos,150,35.00,Pharma SA,2025-01-20,2027-01-31,disponible,7501234567892,LOTE-2025-003,20,800,40,10,Anaquel A-3,/images/ibuprofeno.jpg
+AMX-004,MED-004,Amoxicilina 500mg,Antibiótico de amplio espectro,Medicamentos,80,45.00,BioMed Labs,2025-03-01,2026-09-30,disponible,7501234567893,LOTE-2025-004,5,300,15,21,Anaquel B-1,
+DIP-005,MED-005,Dipirona 1g,Analgésico y antipirético,Medicamentos,120,22.00,Pharma SA,2025-02-15,2026-08-31,disponible,7501234567894,LOTE-2025-005,10,500,25,7,Anaquel B-2,

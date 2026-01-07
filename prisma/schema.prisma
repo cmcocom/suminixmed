@@ -1,0 +1,834 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Account {
+  id                String  @id
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+  User              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Inventario {
+  id                          String                        @id
+  nombre                      String
+  descripcion                 String?
+  categoria                   String
+  cantidad                    Int                           @default(0)
+  precio                      Float                         @default(0)
+  unidad_medida_id            String?
+  fechaVencimiento            DateTime?
+  estado                      String                        @default("disponible")
+  imagen                      String?
+  createdAt                   DateTime                      @default(now())
+  updatedAt                   DateTime
+  categoria_id                String?
+  numero_lote                 String?                       @db.VarChar(50)
+  cantidad_maxima             Int                           @default(0)
+  cantidad_minima             Int                           @default(0)
+  dias_reabastecimiento       Int                           @default(7)
+  punto_reorden               Int                           @default(0)
+  ubicacion_general           String?                       @db.VarChar(100)
+  clave                       String?                       @unique @db.VarChar(50)
+  clave2                      String?                       @unique @db.VarChar(50)
+  categorias                  categorias?                   @relation(fields: [categoria_id], references: [id])
+  unidades_medida             unidades_medida?              @relation(fields: [unidad_medida_id], references: [id])
+  detalle_orden_compra        detalle_orden_compra[]
+  ffijo                       ffijo[]
+  inventario_almacen          inventario_almacen[]
+  inventarios_fisicos_detalle inventarios_fisicos_detalle[]
+  partidas_entrada_inventario partidas_entrada_inventario[]
+  partidas_salida_inventario  partidas_salida_inventario[]
+
+  @@index([cantidad, cantidad_minima, punto_reorden])
+  @@index([cantidad])
+  @@index([cantidad_minima])
+  @@index([categoria_id])
+  @@index([categoria])
+  @@index([estado])
+  @@index([fechaVencimiento])
+  @@index([punto_reorden])
+  @@index([ubicacion_general])
+  @@index([unidad_medida_id])
+}
+
+model Session {
+  id           String   @id
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  User         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model User {
+  id                     String                   @id
+  name                   String?
+  email                  String?                  @unique
+  password               String?
+  emailVerified          DateTime?
+  image                  String?
+  activo                 Boolean                  @default(true)
+  createdAt              DateTime                 @default(now())
+  updatedAt              DateTime                 @default(now())
+  is_system_user         Boolean                  @default(false)
+  clave                  String                   @unique @db.VarChar(50)
+  telefono               String?                  @db.VarChar(20)
+  Account                Account[]
+  Session                Session[]
+  active_sessions        active_sessions[]
+  clientes               clientes[]
+  dashboard_user_configs dashboard_user_configs[]
+  empleados              empleados?
+  entradas_inventario    entradas_inventario[]
+  ffijo                  ffijo[]
+  generated_reports      generated_reports[]
+  inventarios_fisicos    inventarios_fisicos[]
+  ordenes_compra         ordenes_compra[]
+  rbac_user_roles        rbac_user_roles[]
+  salidas_inventario     salidas_inventario[]
+  session_close_reasons  session_close_reasons[] // 🔧 MEJORA: Relación con razones de cierre de sesión
+
+  @@index([activo])
+  @@index([clave])
+  @@index([email, activo])
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model active_sessions {
+  id           String   @id
+  userId       String
+  tabId        String   @db.VarChar(50)
+  lastActivity DateTime
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime
+  User         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, tabId])
+  @@index([lastActivity])
+  @@index([lastActivity], map: "active_sessions_last_activity_idx")
+  @@index([userId, lastActivity])
+  @@index([userId, lastActivity], map: "active_sessions_user_activity_idx")
+}
+
+/// 🔧 MEJORA: Tabla para rastrear razones específicas de cierre de sesiones
+/// Permite análisis de false positives y mejora de la detección contextual
+model session_close_reasons {
+  id                String   @id @default(cuid())
+  session_id        String?  @db.VarChar(50)  // ID de la sesión activa (puede ser null si no se pudo obtener)
+  user_id           String                      // Usuario afectado (requerido)
+  tab_id            String?  @db.VarChar(50)   // ID de la pestaña (puede ser null)
+  reason            String   @db.VarChar(50)   // manual, inactivity, other_device, system_restart, network_error
+  sub_reason        String?  @db.VarChar(100)  // Razón específica adicional
+  device_fingerprint String? @db.VarChar(255) // Fingerprint del dispositivo para análisis
+  user_agent        String?  @db.Text         // User agent completo
+  ip_address        String?  @db.VarChar(45)  // IP del usuario
+  timestamp         DateTime @default(now())  // Momento exacto del cierre
+  is_false_positive Boolean? @default(false)  // Marcado manual para análisis
+  notes             String?  @db.Text         // Notas adicionales para debugging
+  
+  // Relación con el usuario
+  User              User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  
+  // Índices para consultas eficientes
+  @@index([user_id, timestamp])
+  @@index([reason, timestamp])
+  @@index([device_fingerprint])
+  @@index([is_false_positive])
+}
+
+model almacenes {
+  id                  String                @id
+  nombre              String                @db.VarChar(100)
+  descripcion         String?               @db.VarChar(255)
+  direccion           String?               @db.VarChar(255)
+  responsable         String?               @db.VarChar(100)
+  telefono            String?               @db.VarChar(20)
+  email               String?               @db.VarChar(100)
+  activo              Boolean               @default(true)
+  es_principal        Boolean               @default(false)
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime
+  entradas_inventario entradas_inventario[]
+  inventario_almacen  inventario_almacen[]
+  inventarios_fisicos inventarios_fisicos[]
+  salidas_inventario  salidas_inventario[]
+  ubicaciones_almacen ubicaciones_almacen[]
+
+  @@index([activo])
+  @@index([es_principal])
+  @@index([nombre, activo])
+}
+
+model audit_log {
+  id          Int      @id @default(autoincrement())
+  table_name  String   @db.VarChar(50)
+  record_id   String
+  action      String   @db.VarChar(50)
+  old_values  Json?
+  new_values  Json?
+  changed_at  DateTime @default(now())
+  description String?
+  ip_address  String?
+  level       String   @default("MEDIUM") @db.VarChar(20)
+  metadata    Json?
+  user_agent  String?
+  user_id     String?
+  user_name   String?  @db.VarChar(255)
+
+  @@index([action])
+  @@index([changed_at])
+  @@index([level])
+  @@index([table_name, action])
+  @@index([table_name, record_id])
+  @@index([user_id, changed_at])
+  @@index([user_id])
+}
+
+model categorias {
+  id          String       @id
+  nombre      String       @unique @db.VarChar(100)
+  descripcion String?      @db.VarChar(255)
+  activo      Boolean      @default(true)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime
+  Inventario  Inventario[]
+
+  @@index([activo])
+  @@index([nombre, activo])
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model clientes {
+  id                 String               @id
+  nombre             String               @db.VarChar(150)
+  email              String?              @unique @db.VarChar(100)
+  telefono           String?              @db.VarChar(20)
+  direccion          String?              @db.VarChar(255)
+  rfc                String?              @db.VarChar(20)
+  empresa            String?              @db.VarChar(150)
+  contacto           String?              @db.VarChar(100)
+  activo             Boolean              @default(true)
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime
+  imagen             String?              @db.VarChar(255)
+  id_usuario         String?
+  codigo_postal      String?              @db.VarChar(10)
+  clave              String?              @db.VarChar(50)
+  medico_tratante    String?              @db.VarChar(200)
+  especialidad       String?              @db.VarChar(150)
+  localidad          String?              @db.VarChar(150)
+  estado             String?              @db.VarChar(100)
+  pais               String?              @default("México") @db.VarChar(100)
+  User               User?                @relation(fields: [id_usuario], references: [id])
+  ffijo              ffijo[]
+  salidas_inventario salidas_inventario[]
+
+  @@index([activo])
+  @@index([email, activo])
+  @@index([id_usuario, activo])
+  @@index([id_usuario])
+  @@index([clave], map: "idx_clientes_clave")
+  @@index([especialidad], map: "idx_clientes_especialidad")
+  @@index([localidad], map: "idx_clientes_localidad")
+  @@index([localidad, estado], map: "idx_clientes_localidad_estado")
+  @@index([medico_tratante], map: "idx_clientes_medico_tratante")
+}
+
+model configuracion_salidas {
+  id                             Int      @id @default(autoincrement())
+  acumular_pendientes_con_fijo   Boolean  @default(true)
+  dias_restablecimiento_global   Int      @default(30)
+  permitir_solicitudes_sin_stock Boolean  @default(true)
+  notificar_excesos_fondo        Boolean  @default(true)
+  max_dias_pendiente             Int      @default(30)
+  createdat                      DateTime @default(now())
+  updatedat                      DateTime @default(now())
+}
+
+model config_folios {
+  id            Int       @id @default(autoincrement())
+  tipo          String    @unique
+  serie_actual  String?   @default("")
+  proximo_folio Int?      @default(1)
+  created_at    DateTime? @default(now())
+  updated_at    DateTime? @default(now())
+}
+
+model dashboard_user_configs {
+  id         String   @id
+  user_id    String
+  config     String   @db.Text
+  created_at DateTime @default(now())
+  updated_at DateTime @default(now())
+  User       User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@unique([user_id])
+  @@index([user_id])
+}
+
+model detalle_orden_compra {
+  id              String         @id
+  orden_compra_id String
+  producto_id     String
+  cantidad        Int
+  precio_unitario Decimal        @db.Decimal(10, 2)
+  subtotal        Decimal        @db.Decimal(10, 2)
+  orden           Int            @default(0)
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime
+  ordenes_compra  ordenes_compra @relation(fields: [orden_compra_id], references: [id], onDelete: Cascade)
+  Inventario      Inventario     @relation(fields: [producto_id], references: [id], onDelete: Cascade)
+
+  @@index([orden_compra_id])
+  @@index([orden])
+  @@index([producto_id])
+}
+
+model empleados {
+  id              String   @id
+  user_id         String?  @unique
+  numero_empleado String   @unique @db.VarChar(20)
+  nombre          String   @db.VarChar(200)
+  cargo           String   @db.VarChar(100)
+  servicio        String?  @db.VarChar(100)
+  turno           String   @db.VarChar(50)
+  correo          String?  @unique @db.VarChar(100)
+  celular         String?  @db.VarChar(20)
+  activo          Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime
+  User            User?    @relation(fields: [user_id], references: [id])
+
+  @@index([activo])
+  @@index([numero_empleado])
+  @@index([servicio, activo])
+  @@index([user_id])
+}
+
+model entidades {
+  id_empresa              String        @id
+  nombre                  String        @db.VarChar(150)
+  rfc                     String        @unique @db.VarChar(20)
+  logo                    String?       @db.VarChar(255)
+  correo                  String?       @db.VarChar(100)
+  telefono                String?       @db.VarChar(20)
+  contacto                String?       @db.VarChar(100)
+  fecha_registro          DateTime      @default(now())
+  estatus                 EstadoEntidad @default(activo)
+  createdAt               DateTime      @default(now())
+  updatedAt               DateTime
+  tiempo_sesion_minutos   Int           @default(30)
+  licencia_usuarios_max   Int           @default(5)
+  capturar_lotes_entradas Boolean       @default(false)
+
+  @@index([estatus])
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model entradas_inventario {
+  id                          String                        @id
+  folio                       String?                       @db.VarChar(50)
+  serie                       String?                       @db.VarChar(50)
+  fecha_entrada               DateTime?
+  motivo                      String                        @db.VarChar(255)
+  observaciones               String?
+  total                       Decimal                       @default(0) @db.Decimal(10, 2)
+  estado                      String                        @default("COMPLETADA") @db.VarChar(50)
+  fecha_creacion              DateTime                      @default(now())
+  user_id                     String
+  createdAt                   DateTime                      @default(now())
+  updatedAt                   DateTime
+  almacen_id                  String?
+  proveedor_id                String?
+  referencia_externa          String?                       @db.VarChar(100)
+  tipo_entrada_id             String?
+  almacenes                   almacenes?                    @relation(fields: [almacen_id], references: [id])
+  User                        User?                         @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  proveedores                 proveedores?                  @relation(fields: [proveedor_id], references: [id], onUpdate: NoAction, map: "fk_entradas_proveedor")
+  tipos_entrada               tipos_entrada?                @relation(fields: [tipo_entrada_id], references: [id], onUpdate: NoAction, map: "fk_tipo_entrada")
+  partidas_entrada_inventario partidas_entrada_inventario[]
+
+  @@index([almacen_id])
+  @@index([estado])
+  @@index([fecha_creacion])
+  @@index([fecha_entrada])
+  @@index([proveedor_id])
+  @@index([referencia_externa])
+  @@index([user_id])
+  @@index([tipo_entrada_id])
+  @@index([proveedor_id, fecha_creacion])
+  @@index([folio])
+  @@index([serie, folio])
+}
+
+model ffijo {
+  id_fondo                      String     @id
+  id_departamento               String
+  id_producto                   String
+  createdAt                     DateTime   @default(now())
+  updatedAt                     DateTime
+  cantidad_asignada             Int        @default(0)
+  cantidad_disponible           Int        @default(0)
+  cantidad_minima               Int        @default(0)
+  estado                        String     @default("activo") @db.VarChar(20)
+  id_cliente                    String?
+  observaciones                 String?    @db.VarChar(255)
+  dias_restablecimiento         Int        @default(7)
+  ultima_fecha_restablecimiento DateTime   @default(now()) @db.Date
+  clientes                      clientes?  @relation(fields: [id_cliente], references: [id])
+  User                          User       @relation(fields: [id_departamento], references: [id], onDelete: Cascade)
+  Inventario                    Inventario @relation(fields: [id_producto], references: [id], onDelete: Cascade)
+
+  @@unique([id_departamento, id_producto])
+  @@index([cantidad_disponible, cantidad_minima])
+  @@index([cantidad_disponible])
+  @@index([cantidad_minima])
+  @@index([dias_restablecimiento])
+  @@index([estado])
+  @@index([id_cliente])
+  @@index([ultima_fecha_restablecimiento])
+}
+
+model generated_reports {
+  id            String   @id
+  name          String   @db.VarChar(100)
+  description   String?  @db.VarChar(255)
+  slug          String   @unique @db.VarChar(100)
+  is_active     Boolean  @default(true)
+  tables        Json
+  columns       Json
+  filters       Json
+  allowed_roles String[]
+  created_by    String
+  show_filters  Boolean  @default(true)
+  show_export   Boolean  @default(true)
+  page_size     Int      @default(50)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime
+  User          User     @relation(fields: [created_by], references: [id], onDelete: Cascade)
+
+  @@index([is_active])
+  @@index([slug])
+}
+
+model inventario_almacen {
+  id                  String               @id
+  producto_id         String
+  almacen_id          String
+  ubicacion_id        String?
+  cantidad            Int                  @default(0)
+  cantidad_minima     Int                  @default(0)
+  cantidad_maxima     Int                  @default(0)
+  punto_reorden       Int                  @default(0)
+  activo              Boolean              @default(true)
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime
+  almacenes           almacenes            @relation(fields: [almacen_id], references: [id], onDelete: Cascade)
+  Inventario          Inventario           @relation(fields: [producto_id], references: [id], onDelete: Cascade)
+  ubicaciones_almacen ubicaciones_almacen? @relation(fields: [ubicacion_id], references: [id])
+
+  @@unique([producto_id, almacen_id])
+  @@index([almacen_id])
+  @@index([cantidad, cantidad_minima])
+  @@index([cantidad])
+  @@index([producto_id])
+  @@index([ubicacion_id])
+}
+
+model inventarios_fisicos {
+  id                          String                        @id
+  nombre                      String                        @db.VarChar(200)
+  descripcion                 String?
+  fecha_inicio                DateTime                      @default(now())
+  fecha_finalizacion          DateTime?
+  estado                      String                        @default("EN_PROCESO") @db.VarChar(50)
+  almacen_id                  String?
+  usuario_creador_id          String
+  total_productos             Int                           @default(0)
+  total_ajustes               Int                           @default(0)
+  createdAt                   DateTime                      @default(now())
+  updatedAt                   DateTime
+  almacenes                   almacenes?                    @relation(fields: [almacen_id], references: [id])
+  User                        User                          @relation(fields: [usuario_creador_id], references: [id], onDelete: Cascade)
+  inventarios_fisicos_detalle inventarios_fisicos_detalle[]
+
+  @@index([almacen_id])
+  @@index([estado])
+  @@index([fecha_inicio])
+  @@index([usuario_creador_id])
+}
+
+model inventarios_fisicos_detalle {
+  id                   String              @id
+  inventario_fisico_id String
+  producto_id          String
+  cantidad_sistema     Int
+  cantidad_contada     Int?
+  diferencia           Int?
+  observaciones        String?
+  ajustado             Boolean             @default(false)
+  createdAt            DateTime            @default(now())
+  updatedAt            DateTime
+  inventarios_fisicos  inventarios_fisicos @relation(fields: [inventario_fisico_id], references: [id], onDelete: Cascade)
+  Inventario           Inventario          @relation(fields: [producto_id], references: [id])
+
+  @@unique([inventario_fisico_id, producto_id])
+  @@index([ajustado])
+  @@index([inventario_fisico_id])
+  @@index([producto_id])
+}
+
+model ordenes_compra {
+  id                     String                 @id
+  numero_orden           String                 @unique @db.VarChar(50)
+  proveedor_id           String
+  fecha_orden            DateTime               @default(now())
+  fecha_entrega_esperada DateTime?
+  estado                 String                 @default("PENDIENTE") @db.VarChar(20)
+  total                  Decimal                @default(0) @db.Decimal(10, 2)
+  observaciones          String?
+  usuario_id             String
+  createdAt              DateTime               @default(now())
+  updatedAt              DateTime
+  detalle_orden_compra   detalle_orden_compra[]
+  proveedores            proveedores            @relation(fields: [proveedor_id], references: [id], onDelete: Cascade)
+  User                   User                   @relation(fields: [usuario_id], references: [id], onDelete: Cascade)
+
+  @@index([estado])
+  @@index([fecha_orden])
+  @@index([proveedor_id])
+  @@index([usuario_id])
+}
+
+model partidas_entrada_inventario {
+  id                      String                       @id
+  entrada_id              String
+  inventario_id           String
+  cantidad                Int
+  precio                  Decimal                      @db.Decimal(10, 2)
+  orden                   Int                          @default(0)
+  numero_lote             String?                      @db.VarChar(50)
+  fecha_vencimiento       DateTime?
+  cantidad_disponible     Int                          @default(0)
+  createdAt               DateTime                     @default(now())
+  updatedAt               DateTime
+  entradas_inventario     entradas_inventario          @relation(fields: [entrada_id], references: [id], onDelete: Cascade)
+  Inventario              Inventario                   @relation(fields: [inventario_id], references: [id], onDelete: Cascade)
+  salidas_desde_este_lote partidas_salida_inventario[]
+
+  @@index([entrada_id])
+  @@index([inventario_id])
+  @@index([orden])
+  @@index([fecha_vencimiento])
+  @@index([numero_lote])
+  @@index([entrada_id, inventario_id])
+}
+
+model partidas_salida_inventario {
+  id                     String                       @id
+  salida_id              String
+  inventario_id          String
+  cantidad               Int
+  precio                 Decimal                      @db.Decimal(10, 2)
+  orden                  Int                          @default(0)
+  lote_entrada_id        String?                      @db.VarChar(255)
+  numero_lote            String?                      @db.VarChar(50)
+  fecha_vencimiento_lote DateTime?
+  createdAt              DateTime                     @default(now())
+  updatedAt              DateTime
+  Inventario             Inventario                   @relation(fields: [inventario_id], references: [id], onDelete: Cascade)
+  salidas_inventario     salidas_inventario           @relation(fields: [salida_id], references: [id], onDelete: Cascade)
+  lote_entrada           partidas_entrada_inventario? @relation(fields: [lote_entrada_id], references: [id], onDelete: SetNull)
+
+  @@index([inventario_id])
+  @@index([orden])
+  @@index([salida_id])
+  @@index([lote_entrada_id])
+  @@index([numero_lote])
+  @@index([salida_id, inventario_id])
+}
+
+model proveedores {
+  id                  String                @id
+  nombre              String                @db.VarChar(150)
+  razon_social        String?               @db.VarChar(200)
+  email               String?               @unique @db.VarChar(100)
+  telefono            String?               @db.VarChar(20)
+  direccion           String?               @db.VarChar(255)
+  rfc                 String?               @unique @db.VarChar(20)
+  contacto            String?               @db.VarChar(100)
+  sitio_web           String?               @db.VarChar(255)
+  notas               String?
+  activo              Boolean               @default(true)
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime
+  imagen              String?               @db.VarChar(255)
+  condiciones_pago    String?               @db.VarChar(100)
+  entradas_inventario entradas_inventario[]
+  ordenes_compra      ordenes_compra[]
+
+  @@index([activo])
+  @@index([email, activo])
+  @@index([nombre, activo])
+  @@index([rfc, activo])
+}
+
+model rbac_audit_log {
+  id         String   @id
+  table_name String
+  operation  String
+  record_id  String
+  old_values Json?
+  new_values Json?
+  user_id    String
+  created_at DateTime @default(now())
+}
+
+model rbac_permissions {
+  id                    String                  @id
+  name                  String
+  description           String?
+  module                String
+  action                String
+  is_active             Boolean                 @default(true)
+  created_by            String
+  created_at            DateTime                @default(now())
+  updated_at            DateTime                @default(now())
+  rbac_role_permissions rbac_role_permissions[]
+
+  @@unique([module, action])
+}
+
+model rbac_role_permissions {
+  id               String           @id
+  role_id          String
+  permission_id    String
+  granted          Boolean          @default(true)
+  granted_by       String
+  granted_at       DateTime         @default(now())
+  rbac_permissions rbac_permissions @relation(fields: [permission_id], references: [id], onDelete: Cascade)
+  rbac_roles       rbac_roles       @relation(fields: [role_id], references: [id], onDelete: Cascade)
+
+  @@unique([role_id, permission_id])
+}
+
+model rbac_roles {
+  id                     String                   @id
+  name                   String                   @unique
+  description            String?
+  is_active              Boolean                  @default(true)
+  created_by             String
+  created_at             DateTime                 @default(now())
+  updated_at             DateTime                 @default(now())
+  is_system_role         Boolean                  @default(false)
+  rbac_role_permissions  rbac_role_permissions[]
+  rbac_user_roles        rbac_user_roles[]
+  rbac_module_visibility rbac_module_visibility[]
+}
+
+model rbac_user_roles {
+  id          String     @id
+  user_id     String
+  role_id     String
+  assigned_by String
+  assigned_at DateTime   @default(now())
+  updated_at  DateTime   @default(now())
+  rbac_roles  rbac_roles @relation(fields: [role_id], references: [id], onDelete: Cascade)
+  User        User       @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@unique([user_id, role_id])
+}
+
+/// Tabla para controlar visibilidad de módulos independiente de permisos funcionales
+model rbac_module_visibility {
+  id         String     @id
+  role_id    String
+  module_key String     @db.VarChar(100)
+  is_visible Boolean    @default(true)
+  created_by String
+  created_at DateTime   @default(now())
+  updated_at DateTime   @default(now())
+  rbac_roles rbac_roles @relation(fields: [role_id], references: [id], onDelete: Cascade)
+
+  @@unique([role_id, module_key])
+  @@index([role_id])
+  @@index([module_key])
+  @@index([role_id, is_visible])
+}
+
+model salidas_inventario {
+  id                         String                       @id
+  folio                      String?                      @db.VarChar(50)
+  serie                      String?                      @db.VarChar(50)
+  fecha_salida               DateTime?
+  cliente_id                 String?
+  motivo                     String                       @db.VarChar(255)
+  observaciones              String
+  total                      Decimal                      @default(0) @db.Decimal(10, 2)
+  estado                     String                       @default("COMPLETADA") @db.VarChar(50)
+  fecha_creacion             DateTime                     @default(now())
+  user_id                    String
+  createdAt                  DateTime                     @default(now())
+  updatedAt                  DateTime
+  estado_surtido             String                       @default("pendiente_surtido") @db.VarChar(20)
+  solicitud_origen_id        String?                      @db.VarChar(255)
+  tipo_salida                String                       @default("normal") @db.VarChar(20)
+  almacen_id                 String?
+  tipo_salida_id             String?
+  partidas_salida_inventario partidas_salida_inventario[]
+  tipos_salida               tipos_salida?                @relation(fields: [tipo_salida_id], references: [id], onUpdate: NoAction, map: "fk_tipo_salida")
+  almacenes                  almacenes?                   @relation(fields: [almacen_id], references: [id])
+  clientes                   clientes?                    @relation(fields: [cliente_id], references: [id])
+  User                       User                         @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([almacen_id])
+  @@index([cliente_id])
+  @@index([estado])
+  @@index([estado_surtido])
+  @@index([fecha_creacion])
+  @@index([fecha_salida])
+  @@index([solicitud_origen_id])
+  @@index([tipo_salida])
+  @@index([user_id])
+  @@index([tipo_salida_id])
+  @@index([cliente_id, fecha_creacion])
+  @@index([folio])
+  @@index([serie, folio])
+}
+
+model tipos_entrada {
+  id                  String                @id
+  codigo              String                @unique @db.VarChar(50)
+  nombre              String                @db.VarChar(100)
+  descripcion         String?
+  color               String?               @default("blue") @db.VarChar(20)
+  icono               String?               @default("document") @db.VarChar(50)
+  requiere_proveedor  Boolean?              @default(false)
+  requiere_referencia Boolean?              @default(false)
+  activo              Boolean?              @default(true)
+  orden               Int?                  @default(0)
+  created_at          DateTime?             @default(now())
+  updated_at          DateTime?             @default(now())
+  entradas_inventario entradas_inventario[]
+
+  @@index([activo])
+  @@index([orden])
+}
+
+model tipos_salida {
+  id                  String               @id
+  codigo              String               @unique @db.VarChar(50)
+  nombre              String               @db.VarChar(100)
+  descripcion         String?
+  color               String?              @default("blue") @db.VarChar(20)
+  icono               String?              @default("document") @db.VarChar(50)
+  requiere_destino    Boolean?             @default(false)
+  requiere_referencia Boolean?             @default(false)
+  requiere_cliente    Boolean?             @default(false)
+  activo              Boolean?             @default(true)
+  orden               Int?                 @default(0)
+  created_at          DateTime?            @default(now())
+  updated_at          DateTime?            @default(now())
+  salidas_inventario  salidas_inventario[]
+
+  @@index([activo])
+  @@index([orden])
+}
+
+model ubicaciones_almacen {
+  id                 String               @id
+  almacen_id         String
+  nombre             String               @db.VarChar(50)
+  descripcion        String?              @db.VarChar(255)
+  tipo               String               @default("ESTANTE") @db.VarChar(20)
+  activo             Boolean              @default(true)
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime
+  inventario_almacen inventario_almacen[]
+  almacenes          almacenes            @relation(fields: [almacen_id], references: [id], onDelete: Cascade)
+
+  @@unique([almacen_id, nombre])
+  @@index([almacen_id, activo])
+  @@index([tipo])
+}
+
+model unidades_medida {
+  id          String       @id
+  clave       String       @unique @db.VarChar(20)
+  nombre      String       @db.VarChar(100)
+  descripcion String?      @db.VarChar(255)
+  activo      Boolean      @default(true)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime
+  Inventario  Inventario[]
+
+  @@index([activo])
+  @@index([clave])
+}
+
+enum EstadoEntidad {
+  activo
+  inactivo
+}
+
+// ============================================================
+// SISTEMA DE RESPALDOS AUTOMÁTICOS
+// ============================================================
+
+model backup_config {
+  id             Int       @id @default(autoincrement())
+  enabled        Boolean   @default(false)
+  frequency      String    @default("daily") @db.VarChar(20) // 'daily', 'weekly', 'monthly'
+  dayOfWeek      Int?      @map("day_of_week") // 0-6 para semanal
+  dayOfMonth     Int?      @map("day_of_month") // 1-31 para mensual
+  hour           Int       @default(3) // 0-23
+  minute         Int       @default(0) // 0-59
+  retentionDays  Int       @default(30) @map("retention_days")
+  retentionCount Int?      @map("retention_count") // Número máximo de respaldos a mantener
+  lastRun        DateTime? @map("last_run")
+  nextRun        DateTime? @map("next_run")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @map("updated_at")
+}
+
+model backup_history {
+  id              Int       @id @default(autoincrement())
+  filename        String    @db.VarChar(255)
+  backupType      String    @map("backup_type") @db.VarChar(20) // 'automatic' | 'manual'
+  status          String    @db.VarChar(20) // 'success' | 'failed'
+  sizeBytes       BigInt?   @map("size_bytes")
+  tablesCount     Int?      @map("tables_count")
+  errorMessage    String?   @map("error_message")
+  startedAt       DateTime  @default(now()) @map("started_at")
+  completedAt     DateTime? @map("completed_at")
+  durationSeconds Int?      @map("duration_seconds")
+  createdBy       String?   @map("created_by") @db.VarChar(100)
+  description     String?   @db.VarChar(255)
+
+  @@index([backupType])
+  @@index([status])
+  @@index([startedAt])
+}

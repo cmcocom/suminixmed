@@ -1,0 +1,4 @@
+id,nombre,email,telefono,direccion,rfc,empresa,contacto,activo,createdAt,updatedAt,imagen,id_usuario,codigo_postal,clave,medico_tratante,especialidad,localidad,estado,pais
+cliente_1760007607273_3b3v8ub37,ALAMILLA DIAZ AIDA ARACELY,,,,,,,t,2025-10-09 11:00:07.332,2025-10-09 11:00:07.274,,,,CAOF581222/3,DR. JORGE GALINDO,CX ONCO,CHETUMAL,,México
+cliente_1760007607352_j7dl55jbj,ALCOCER SALAZAR SAUL ANTONIO,,,,,,,t,2025-10-09 11:00:07.353,2025-10-09 11:00:07.352,,,,SACI861206/7,DRA. ETNA DEL S. PAZ BAEZA,PEDIATRIA,MERIDA,,México
+cliente_1760007607354_5a5opdr58,ALDANA LOPEZ WILLIAN LOPEZ,,,,,,,t,2025-10-09 11:00:07.354,2025-10-09 11:00:07.354,,,,AALW480811/90,DR. EDWIN FRANCO,ONCO,MERIDA,,México

@@ -1,0 +1,45 @@
+/* =========================================
+   CSS BLOQUEADO TEMPORALMENTE PARA PRUEBAS
+   ========================================= */
+
+/* NO Tailwind CSS - desactivado para pruebas */
+/* @import "tailwindcss"; */
+
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: Arial, Helvetica, sans-serif;
+  margin: 20px;
+  padding: 20px;
+}
+
+/* Estilos mínimos para que la página sea legible */
+* {
+  box-sizing: border-box;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  margin-top: 1em;
+  margin-bottom: 0.5em;
+}
+
+p {
+  margin: 0.5em 0;
+}
+
+button {
+  padding: 8px 16px;
+  margin: 4px;
+  cursor: pointer;
+}
+
+input, select, textarea {
+  padding: 8px;
+  margin: 4px;
+  border: 1px solid #ccc;
+}

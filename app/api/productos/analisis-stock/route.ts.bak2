@@ -1,0 +1,127 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { PrismaClient } from '@prisma/client';
+import { createProtectedAPI } from '@/lib/api-auth';
+
+const prisma = new PrismaClient();
+
+export const GET = createProtectedAPI(
+  'INVENTARIO',
+  'LEER', 
+  async ({ req }: { req: NextRequest }) => {
+    try {
+      const { searchParams } = new URL(req.url);
+      const tipo = searchParams.get('tipo') || 'punto_reorden';
+      const proveedorId = searchParams.get('proveedorId');
+      
+      // Construir condición base
+      const whereCondition: { estado: string; proveedor?: string } = {
+        estado: 'disponible'
+      };
+
+      // Agregar filtro de proveedor si se especifica
+      if (proveedorId) {
+        // Buscar el nombre del proveedor primero
+        const proveedor = await prisma.proveedores.findUnique({
+          where: { id: proveedorId },
+          select: { nombre: true }
+        });
+        
+        if (proveedor) {
+          whereCondition.proveedor = proveedor.nombre;
+        }
+      }
+
+      // Buscar todos los productos disponibles
+      const productos = await prisma.inventario.findMany({
+        where: whereCondition,
+        include: {
+          categorias: {
+            select: {
+              descripcion: true
+            }
+          }
+        },
+        orderBy: [
+          { cantidad: 'asc' },
+          { descripcion: 'asc' }
+        ]
+      });
+
+      // Filtrar productos según el tipo después de obtenerlos
+      const productosFiltrados = productos.filter((producto) => {
+        if (tipo === 'agotados') {
+          return producto.cantidad <= 0;
+        } else if (tipo === 'punto_reorden') {
+          // Usar punto_reorden si está configurado, sino usar cantidad_minima, sino usar 10 como fallback
+          const puntoReorden = producto.punto_reorden || producto.cantidad_minima || 10;
+          return producto.cantidad <= puntoReorden;
+        }
+        return false;
+      });
+
+      // Calcular cantidad sugerida para cada producto
+      const productosConSugerencia = productosFiltrados.map((producto) => {
+        // Usar valores de inventario control o valores por defecto
+        const cantidadMinima = producto.cantidad_minima || 5;
+        const cantidadMaxima = producto.cantidad_maxima || 50;
+        const puntoReorden = producto.punto_reorden || cantidadMinima * 2;
+        const diasReabastecimiento = producto.dias_reabastecimiento || 7;
+        
+        // Calcular cantidad sugerida inteligente
+        let cantidadSugerida = 0;
+        
+        if (producto.cantidad === 0) {
+          // Si está agotado, sugerir llevar al máximo o al menos 3x el mínimo
+          cantidadSugerida = Math.min(cantidadMaxima, cantidadMinima * 3);
+        } else if (producto.cantidad <= puntoReorden) {
+          // Si está en punto de reorden, calcular para llegar al stock óptimo
+          const stockOptimo = Math.ceil((cantidadMinima + cantidadMaxima) / 2);
+          cantidadSugerida = Math.max(stockOptimo - producto.cantidad, cantidadMinima);
+        } else {
+          // Fallback para casos edge
+          cantidadSugerida = cantidadMinima;
+        }
+
+        // Ajustar según días de reabastecimiento (estimación simple)
+        if (diasReabastecimiento > 7) {
+          cantidadSugerida = Math.ceil(cantidadSugerida * 1.5);
+        }
+
+        return {
+          id: producto.id,
+          nombre: producto.descripcion,
+          descripcion: producto.descripcion,
+          stockActual: producto.cantidad,
+          stockMinimo: cantidadMinima,
+          puntoReorden: puntoReorden,
+          stockMaximo: cantidadMaxima,
+          diasReabastecimiento: diasReabastecimiento,
+          precioPrimario: producto.precio,
+          categoria: producto.categorias?.nombre || producto.categoria,
+          proveedor: producto.proveedor ? {
+            id: producto.proveedor, // Usar el nombre como ID temporal
+            nombre: producto.proveedor
+          } : null,
+          sugeridoCantidad: cantidadSugerida
+        };
+      });
+
+      return NextResponse.json({
+        success: true,
+        productos: productosConSugerencia,
+        tipo,
+        proveedorId,
+        total: productosConSugerencia.length,
+        configuracion: {
+          usandoCamposControl: productos.some(p => p.punto_reorden !== null || p.cantidad_minima !== null)
+        }
+      });
+
+    } catch (error) {
+return NextResponse.json(
+        { error: 'Error interno del servidor' },
+        { status: 500 }
+      );
+    }
+  }
+);

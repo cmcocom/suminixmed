@@ -1,0 +1,5 @@
+id,nombre,razon_social,email,telefono,direccion,rfc,contacto,sitio_web,notas,activo,createdAt,updatedAt,imagen,condiciones_pago
+prov_1760000310809_6rdaw3dh9,DCB,,,,,,,,,t,2025-10-09 14:58:30.81,2025-10-09 14:58:30.809,,
+prov_1760000317109_fgvosyt3n,FCB,,,,,,,,,t,2025-10-09 14:58:37.11,2025-10-09 14:58:37.109,,
+prov_1760000323879_ihbsno8ay,SIAM,,,,,,,,,f,2025-10-09 14:58:43.88,2025-10-16 21:26:38.155,,
+prov-001,Proveedor Médico SA de CV,,contacto@proveedor.com,5555555555,Av. Principal #123,PME123456789,,,,f,2025-10-17 10:27:19.988,2025-10-28 20:05:50.139,,

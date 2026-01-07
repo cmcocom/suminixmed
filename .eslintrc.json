@@ -1,0 +1,126 @@
+{
+  // Exclude build artifacts and generated files from linting to reduce noise
+  "ignorePatterns": [".next/", "node_modules/", "out/", "dist/", "public/backup/", "backups/"],
+  "extends": [
+    "next/core-web-vitals",
+    "@typescript-eslint/recommended",
+    "prettier"
+  ],
+  "parser": "@typescript-eslint/parser",
+  "parserOptions": {
+    "ecmaVersion": 2022,
+    "sourceType": "module",
+    "project": "./tsconfig.json"
+  },
+  "plugins": ["@typescript-eslint", "prettier"],
+  "rules": {
+    // Prettier integration
+    "prettier/prettier": "warn",
+    
+    // ===============================
+    // REGLAS CRÍTICAS - NO DESHABILITAR
+    // ===============================
+    
+    // Variables no utilizadas - ERROR (previene código muerto)
+    "@typescript-eslint/no-unused-vars": ["error", {
+      "argsIgnorePattern": "^_",
+      "varsIgnorePattern": "^_",
+      "caughtErrorsIgnorePattern": "^_"
+    }],
+    
+    // Tipos explícitos any - WARNING (fuerza tipado)
+    "@typescript-eslint/no-explicit-any": "warn",
+    
+    // Dependencias de hooks - ERROR (previene bugs de React)
+    "react-hooks/exhaustive-deps": "error",
+    
+    // ===============================
+    // REGLAS DE SEGURIDAD
+    // ===============================
+    
+    // Prevenir eval y similares
+    "no-eval": "error",
+    "no-implied-eval": "error",
+    
+    // Prevenir variables globales accidentales
+    "no-undef": "error",
+    
+    // Prevenir redeclaraciones
+    "no-redeclare": "error",
+    "@typescript-eslint/no-redeclare": "error",
+    
+    // ===============================
+    // REGLAS DE CALIDAD DE CÓDIGO
+    // ===============================
+    
+    // Funciones async deben usar await
+    "@typescript-eslint/require-await": "warn",
+    
+    // Usar const cuando sea posible
+    "prefer-const": "error",
+    
+    // No usar var
+    "no-var": "error",
+    
+    // Comparaciones estrictas
+    "eqeqeq": ["error", "always", { "null": "ignore" }],
+    
+    // ===============================
+    // REGLAS ESPECÍFICAS DE REACT/NEXT.js
+    // ===============================
+    
+    // Entidades HTML escapadas - WARN (permite ' y ")
+    "react/no-unescaped-entities": ["warn", {
+      "forbid": [">", "}", "\""]
+    }],
+    
+    // Exportaciones por defecto anónimas - WARN
+    "import/no-anonymous-default-export": "warn",
+    
+    // Require imports permitido para Node.js scripts
+    "@typescript-eslint/no-require-imports": ["warn", {
+      "allow": ["**/*.mjs", "**/*.js"]
+    }],
+    
+    // ===============================
+    // REGLAS DE ACCESIBILIDAD
+    // ===============================
+    
+    // Elementos de formulario deben tener labels
+    "jsx-a11y/label-has-associated-control": "warn",
+    
+    // Imágenes deben tener alt
+    "jsx-a11y/alt-text": "error",
+    
+    // ===============================
+    // REGLAS RELAJADAS PARA DESARROLLO
+    // ===============================
+    
+    // Console permitido en desarrollo
+    "no-console": ["warn", { 
+      "allow": ["warn", "error", "info", "debug"] 
+    }],
+    
+    // Debugger solo warning
+    "no-debugger": "warn"
+  },
+  
+  // Configuración específica por tipo de archivo
+  "overrides": [
+    {
+      "files": ["**/*.mjs", "scripts/**/*.js", "scripts/**/*.mjs"],
+      "rules": {
+        "@typescript-eslint/no-require-imports": "off",
+        "@typescript-eslint/no-var-requires": "off",
+        "no-undef": "off"
+      }
+    },
+    {
+      "files": ["**/*.test.ts", "**/*.test.tsx", "**/*.spec.ts", "**/*.spec.tsx"],
+      "rules": {
+        "@typescript-eslint/no-explicit-any": "off",
+        "no-console": "off"
+      }
+    }
+  ]
+}

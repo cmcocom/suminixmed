@@ -1,0 +1,196 @@
+{
+  // ========================================
+  // CONFIGURACIÓN DEL TERMINAL
+  // ========================================
+  "terminal.integrated.env.osx": {
+    "DISABLE_AUTO_UPDATE": "true",
+    "NODE_OPTIONS": "--max-old-space-size=2048"
+  },
+  "terminal.integrated.inheritEnv": true,
+  "terminal.integrated.enablePersistentSessions": false,
+  "terminal.integrated.tabs.enableAnimation": false,
+  
+  // Aumenta el buffer del historial del terminal (10,000 líneas)
+  "terminal.integrated.scrollback": 10000,
+  
+  // Aumenta el timeout de comandos a 30 segundos
+  "terminal.integrated.commandTimeout": 30000,
+  
+  // Habilita integración avanzada del shell
+  "terminal.integrated.shellIntegration.enabled": true,
+  "terminal.integrated.shellIntegration.decorationsEnabled": "both",
+  "terminal.integrated.shellIntegration.showWelcome": false,
+  
+  // Reduce logging interno del terminal
+  "terminal.integrated.logLevel": "off",
+
+  // ========================================
+  // OPTIMIZACIÓN PARA ARCHIVOS GRANDES
+  // ========================================
+  
+  // Límite de tamaño de archivo antes de desactivar funciones (4GB - ajustado para 8GB RAM)
+  "files.maxMemoryForLargeFilesMB": 4096,
+  
+  // Desactiva auto-guardado en archivos grandes
+  "files.autoSaveDelay": 3000,
+  "files.autoSave": "afterDelay",
+  
+  // Excluye archivos grandes de la búsqueda y vigilancia
+  "files.watcherExclude": {
+    "**/.git/objects/**": true,
+    "**/.git/subtree-cache/**": true,
+    "**/node_modules/**": true,
+    "**/.hg/store/**": true,
+    "**/dist/**": true,
+    "**/build/**": true,
+    "**/.next/**": true,
+    "**/coverage/**": true,
+    "**/*.log": true
+  },
+  
+  "search.exclude": {
+    "**/node_modules": true,
+    "**/bower_components": true,
+    "**/*.code-search": true,
+    "**/dist": true,
+    "**/build": true,
+    "**/.next": true,
+    "**/coverage": true,
+    "**/*.log": true
+  },
+
+  // ========================================
+  // EDITOR - RENDIMIENTO
+  // ========================================
+  
+  // Desactiva minimap en archivos grandes
+  "editor.minimap.enabled": true,
+  "editor.minimap.maxColumn": 120,
+  
+  // Limita el número de decoraciones
+  "editor.maxTokenizationLineLength": 20000,
+  
+  // Optimiza renderizado
+  "editor.renderWhitespace": "selection",
+  "editor.renderControlCharacters": false,
+  "editor.renderLineHighlight": "line",
+  
+  // Desactiva sugerencias inline pesadas en archivos grandes
+  "editor.quickSuggestions": {
+    "other": true,
+    "comments": false,
+    "strings": false
+  },
+  
+  // Reduce validaciones en tiempo real
+  "editor.semanticHighlighting.enabled": true,
+  "editor.bracketPairColorization.enabled": true,
+  
+  // Optimiza scroll
+  "editor.smoothScrolling": false,
+  "editor.cursorBlinking": "phase",
+  "editor.cursorSmoothCaretAnimation": "off",
+
+  // ========================================
+  // TYPESCRIPT/JAVASCRIPT - RENDIMIENTO
+  // ========================================
+  
+  // Aumenta límite de memoria para TypeScript Server (4GB - ajustado para 8GB RAM)
+  "typescript.tsserver.maxTsServerMemory": 4096,
+  
+  // Optimiza validaciones
+  "typescript.disableAutomaticTypeAcquisition": false,
+  "typescript.tsserver.experimental.enableProjectDiagnostics": false,
+  
+  // Reduce logging
+  "typescript.tsserver.log": "off",
+
+  // ========================================
+  // GIT - RENDIMIENTO
+  // ========================================
+  
+  // Desactiva auto-fetch que puede ralentizar
+  "git.autofetch": false,
+  "git.autorefresh": true,
+  
+  // Limita decoraciones de Git
+  "git.decorations.enabled": true,
+  "git.ignoreLimitWarning": true,
+  
+  // Optimiza diff
+  "diffEditor.ignoreTrimWhitespace": true,
+  "diffEditor.maxComputationTime": 5000,
+
+  // ========================================
+  // EXTENSIONES - RENDIMIENTO
+  // ========================================
+  
+  // Copilot - verbosidad mínima
+  "github.copilot.chat.verbosity": "minimal",
+  "github.copilot.enable": {
+    "*": true,
+    "plaintext": false,
+    "markdown": true
+  },
+  
+  // ===============================
+  // ESLINT - CONFIGURACIÓN ESTRICTA
+  // ===============================
+  "eslint.enable": true,
+  "eslint.run": "onType",
+  "eslint.options": {
+    "cache": true
+  },
+  "eslint.validate": [
+    "javascript",
+    "javascriptreact",
+    "typescript",
+    "typescriptreact"
+  ],
+  "eslint.workingDirectories": [
+    {
+      "mode": "auto"
+    }
+  ],
+  
+  // Mostrar problemas de ESLint en Problems panel
+  "eslint.problems.shortenToSingleLine": false,
+  
+  // Auto-fix en save para ESLint
+  "editor.codeActionsOnSave": {
+    "source.fixAll.eslint": "explicit",
+    "source.organizeImports": "explicit"
+  },
+  
+  // ===============================
+  // TYPESCRIPT - CONFIGURACIÓN ESTRICTA
+  // ===============================
+  
+  // Mostrar todos los errores de TypeScript
+  "typescript.preferences.includePackageJsonAutoImports": "on",
+  "typescript.suggest.autoImports": true,
+  "typescript.updateImportsOnFileMove.enabled": "always",
+  
+  // Validación estricta
+  "typescript.validate.enable": true,
+  "javascript.validate.enable": true,
+
+  // ========================================
+  // GENERAL - RENDIMIENTO
+  // ========================================
+  
+  // Desactiva telemetría innecesaria
+  "telemetry.telemetryLevel": "off",
+  
+  // Optimiza ventana
+  "window.restoreWindows": "one",
+  "window.titleBarStyle": "custom",
+  
+  // Reduce animaciones
+  "workbench.list.smoothScrolling": false,
+  "workbench.reduceMotion": "on",
+  
+  // Optimiza problemas y salida
+  "problems.decorations.enabled": true,
+  "output.smartScroll.enabled": true
+}

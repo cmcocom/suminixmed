@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Limpiar Caché - SuminixMed</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+            max-width: 600px;
+            margin: 100px auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        .card {
+            background: white;
+            border-radius: 10px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+        }
+        h1 {
+            color: #333;
+            margin-top: 0;
+        }
+        .btn {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            font-size: 16px;
+            border-radius: 5px;
+            cursor: pointer;
+            width: 100%;
+            margin: 10px 0;
+            font-weight: 600;
+        }
+        .btn:hover {
+            background: #5568d3;
+        }
+        .btn-success {
+            background: #10b981;
+        }
+        .btn-success:hover {
+            background: #059669;
+        }
+        .alert {
+            padding: 15px;
+            border-radius: 5px;
+            margin: 15px 0;
+        }
+        .alert-info {
+            background: #eff6ff;
+            border: 1px solid #bfdbfe;
+            color: #1e40af;
+        }
+        .alert-success {
+            background: #f0fdf4;
+            border: 1px solid #bbf7d0;
+            color: #166534;
+        }
+        .hidden {
+            display: none;
+        }
+        ul {
+            text-align: left;
+            color: #555;
+        }
+        .emoji {
+            font-size: 48px;
+            text-align: center;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <div class="emoji">🧹</div>
+        <h1>Limpiar Caché del Sistema RBAC</h1>
+        
+        <div id="info" class="alert alert-info">
+            <strong>⚠️ Importante:</strong>
+            <ul>
+                <li>Esta herramienta limpia el caché de visibilidad de módulos</li>
+                <li>Úsala cuando veas módulos que no deberías ver</li>
+                <li>Después de limpiar, serás redirigido al login</li>
+            </ul>
+        </div>
+
+        <button id="btnLimpiar" class="btn" onclick="limpiarCache()">
+            🗑️ Limpiar Caché y Recargar
+        </button>
+
+        <div id="success" class="alert alert-success hidden">
+            <strong>✅ Éxito!</strong> Caché limpiado. Redirigiendo al login en <span id="countdown">3</span> segundos...
+        </div>
+    </div>
+
+    <script>
+        function limpiarCache() {
+            try {
+                // Limpiar localStorage
+                localStorage.removeItem('moduleVisibility');
+                
+                // Limpiar sessionStorage también
+                sessionStorage.clear();
+                
+                // Mostrar mensaje de éxito
+                document.getElementById('info').classList.add('hidden');
+                document.getElementById('btnLimpiar').classList.add('hidden');
+                document.getElementById('success').classList.remove('hidden');
+                
+                // Countdown y redirección
+                let seconds = 3;
+                const countdownEl = document.getElementById('countdown');
+                
+                const interval = setInterval(() => {
+                    seconds--;
+                    countdownEl.textContent = seconds;
+                    
+                    if (seconds === 0) {
+                        clearInterval(interval);
+                        // Redirigir al login
+                        window.location.href = '/login';
+                    }
+                }, 1000);
+                
+            } catch (error) {
+                alert('Error al limpiar caché: ' + error.message);
+            }
+        }
+    </script>
+</body>
+</html>

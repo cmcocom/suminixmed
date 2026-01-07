@@ -1,0 +1,2 @@
+-- Esta migración está vacía porque los campos ya fueron creados
+-- en la migración 20251009001_create_tipos_movimientos
