@@ -1,0 +1,1 @@
+\COPY "Inventario" TO 'C:/www/suminixmed/inventario_productos_completo.csv' WITH (FORMAT CSV, HEADER TRUE, DELIMITER ',', QUOTE '"', ESCAPE '"');

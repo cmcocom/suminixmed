@@ -1,22 +1,39 @@
--- Verificar el estado actual de usuarios conectados
-SELECT 
-    'Estado de sesiones activas' as consulta,
-    COUNT(*) as total_sesiones,
-    MAX(u.name) as nombre_usuario,
-    MAX(u.email) as email_usuario,
-    MAX(ases.lastActivity) as ultima_actividad
-FROM active_sessions ases
-JOIN "User" u ON u.id = ases."userId"
-GROUP BY ases."userId"
-ORDER BY MAX(ases.lastActivity) DESC;
+-- Verificación del estado actual de la base de datos
+SELECT 'ESTADO ACTUAL - ' || current_date as fecha_respaldo;
 
--- Ver límite configurado
+SELECT 'CONTEO DE REGISTROS PRINCIPALES' as seccion;
 SELECT 
-    'Límite configurado' as consulta,
-    licencia_usuarios_max as limite_maximo,
-    tiempo_sesion_minutos,
-    estatus
-FROM entidades;
-
--- Estadísticas completas
-SELECT * FROM get_license_stats();
+    'usuarios' as tabla,
+    COUNT(*) as registros 
+FROM "User"
+UNION ALL
+SELECT 
+    'productos',
+    COUNT(*) 
+FROM "Inventario"
+UNION ALL
+SELECT 
+    'entradas',
+    COUNT(*) 
+FROM entradas_inventario
+UNION ALL
+SELECT 
+    'salidas',
+    COUNT(*) 
+FROM salidas_inventario
+UNION ALL
+SELECT 
+    'partidas_entrada',
+    COUNT(*) 
+FROM partidas_entrada_inventario
+UNION ALL
+SELECT 
+    'partidas_salida',
+    COUNT(*) 
+FROM partidas_salida_inventario
+UNION ALL
+SELECT 
+    'clientes',
+    COUNT(*) 
+FROM clientes
+ORDER BY tabla;

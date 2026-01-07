@@ -1,0 +1,1 @@
+COPY "Inventario" TO 'C:/www/suminixmed/inventario_export.csv' WITH CSV HEADER;

@@ -1,0 +1,13 @@
+-- Estado actual de la migración
+SELECT 'CATEGORIAS' as tabla, COUNT(*) as registros FROM categorias
+UNION ALL
+SELECT 'EMPLEADOS', COUNT(*) FROM empleados
+UNION ALL
+SELECT 'PROVEEDORES', COUNT(*) FROM proveedores
+UNION ALL
+SELECT 'UNIDADES DE MEDIDA', COUNT(*) FROM unidades_medida
+UNION ALL
+SELECT 'INVENTARIO (PRODUCTOS)', COUNT(*) FROM "Inventario"
+UNION ALL
+SELECT 'ENTRADAS DE INVENTARIO', COUNT(*) FROM entradas_inventario
+ORDER BY tabla;

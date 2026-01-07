@@ -1,0 +1,1 @@
+\COPY "Inventario" TO 'temp_inventario.csv' WITH CSV HEADER;

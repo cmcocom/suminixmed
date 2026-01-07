@@ -1,0 +1,27 @@
+﻿========================================
+VERIFICACIÓN DE RESPALDO
+========================================
+Fecha creación: 2025-11-23 21:51:41
+Archivo: backup_antes_modulo_entradas_cliente_2025-11-23_21-50-14.backup
+Tamaño: 1.41 MB
+SHA256: 9D08619889489CC8D1069A9565040CA941E45FD9F92445B0063B97166E9034E4
+
+Base de datos: suminix
+Propósito: Respaldo antes de agregar módulo REPORTES_ENTRADAS_CLIENTE
+Estado:  VERIFICADO E ÍNTEGRO
+
+Tablas críticas respaldadas:
+- rbac_permissions (189 registros)
+- rbac_role_permissions (756 registros)
+- entradas_inventario (505 registros)
+- salidas_inventario (1,586 registros)
+- Inventario (513 productos)
+- clientes (208 registros)
+- proveedores (4 registros)
+- empleados (123 registros)
+- User (127 usuarios)
+- audit_log (14,224 eventos)
+
+Para restaurar:
+pg_restore -U postgres -d suminix -c -v backup_antes_modulo_entradas_cliente_2025-11-23_21-50-14.backup
+========================================
